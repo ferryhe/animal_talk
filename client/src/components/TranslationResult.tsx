@@ -1,4 +1,4 @@
-import { SoundDefinition } from "@/lib/sounds";
+import { SoundDefinition } from "@/lib/guineaPigSounds";
 import { Check, ThumbsUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";

@@ -14,7 +14,7 @@ export interface SoundDefinition {
   confidence?: number;
 }
 
-export const SOUND_LIBRARY: SoundDefinition[] = [
+export const GUINEA_PIG_SOUND_LIBRARY: SoundDefinition[] = [
   {
     id: 'wheek',
     name: 'Wheek',
@@ -101,10 +101,10 @@ export const SOUND_LIBRARY: SoundDefinition[] = [
   }
 ];
 
-export const getRandomResult = (): SoundDefinition[] => {
+export const getRandomGuineaPigResult = (): SoundDefinition[] => {
   // Simulate AI prediction by picking a random sound as top match
   // and 1-2 others as lower confidence matches
-  const shuffled = [...SOUND_LIBRARY].sort(() => 0.5 - Math.random());
+  const shuffled = [...GUINEA_PIG_SOUND_LIBRARY].sort(() => 0.5 - Math.random());
   
   const topMatch = { ...shuffled[0], confidence: Math.floor(Math.random() * 15) + 80 }; // 80-95%
   const secondMatch = { ...shuffled[1], confidence: Math.floor(Math.random() * 20) + 40 }; // 40-60%

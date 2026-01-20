@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { AudioVisualizer } from "@/components/AudioVisualizer";
 import { TranslationResult } from "@/components/TranslationResult";
-import { getRandomResult, SoundDefinition } from "@/lib/sounds";
+import { getRandomGuineaPigResult, SoundDefinition } from "@/lib/guineaPigSounds";
 import { getRandomCatResult } from "@/lib/catSounds";
 import { getRandomDogResult } from "@/lib/dogSounds";
 import guineaPigMascot from "@assets/generated_images/cute_guinea_pig_mascot_listening_with_headphones.png";
@@ -17,7 +17,7 @@ interface ListenInterfaceProps {
 }
 
 const ANIMAL_CONFIG = {
-  guinea_pig: { mascot: guineaPigMascot, name_en: 'piggie', name_zh: '豚鼠', getResults: getRandomResult },
+  guinea_pig: { mascot: guineaPigMascot, name_en: 'piggie', name_zh: '豚鼠', getResults: getRandomGuineaPigResult },
   cat: { mascot: catMascot, name_en: 'cat', name_zh: '猫咪', getResults: getRandomCatResult },
   dog: { mascot: dogMascot, name_en: 'dog', name_zh: '狗狗', getResults: getRandomDogResult },
 };

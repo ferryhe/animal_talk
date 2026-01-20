@@ -2,10 +2,10 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Volume2, Music, Play } from "lucide-react";
-import { SOUND_LIBRARY, SoundDefinition } from "@/lib/sounds";
+import { GUINEA_PIG_SOUND_LIBRARY, SoundDefinition } from "@/lib/guineaPigSounds";
 import { CAT_SOUND_LIBRARY } from "@/lib/catSounds";
 import { DOG_SOUND_LIBRARY } from "@/lib/dogSounds";
-import { playGuineaPigSound } from "@/lib/audio";
+import { playGuineaPigSound } from "@/lib/guineaPigAudio";
 import { playCatSound } from "@/lib/catAudio";
 import { playDogSound } from "@/lib/dogAudio";
 import { cn } from "@/lib/utils";
@@ -16,7 +16,7 @@ interface SayInterfaceProps {
 }
 
 const ANIMAL_CONFIG = {
-  guinea_pig: { library: SOUND_LIBRARY, playSound: playGuineaPigSound, name_en: 'Guinea Pig', name_zh: '豚鼠' },
+  guinea_pig: { library: GUINEA_PIG_SOUND_LIBRARY, playSound: playGuineaPigSound, name_en: 'Guinea Pig', name_zh: '豚鼠' },
   cat: { library: CAT_SOUND_LIBRARY, playSound: playCatSound, name_en: 'Cat', name_zh: '猫' },
   dog: { library: DOG_SOUND_LIBRARY, playSound: playDogSound, name_en: 'Dog', name_zh: '狗' },
 };
