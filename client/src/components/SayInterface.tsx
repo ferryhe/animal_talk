@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Volume2, Music, Play } from "lucide-react";
 import { SOUND_LIBRARY, SoundDefinition } from "@/lib/sounds";
+import { playGuineaPigSound } from "@/lib/audio";
 import { cn } from "@/lib/utils";
 
 interface SayInterfaceProps {
@@ -12,15 +13,14 @@ interface SayInterfaceProps {
 export function SayInterface({ language }: SayInterfaceProps) {
   const [playingId, setPlayingId] = useState<string | null>(null);
 
-  const playSound = (sound: SoundDefinition) => {
+  const playSound = async (sound: SoundDefinition) => {
     if (playingId) return;
 
     setPlayingId(sound.id);
     
-    // Simulate playing sound
-    setTimeout(() => {
-      setPlayingId(null);
-    }, 2000);
+    // Play the actual synthesized sound
+    await playGuineaPigSound(sound.id);
+    setPlayingId(null);
   };
 
   return (
