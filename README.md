@@ -28,6 +28,14 @@ an Express server in development and production.
 - `attached_assets/cat-meow-2-cc0.mp3` from Freesound (CC0): https://freesound.org/people/qubodup/sounds/813113/
 - `attached_assets/cat-purr-1-cc0.mp3` from Freesound (CC0): https://freesound.org/people/rareguy27/sounds/690620/
 - `attached_assets/cat-purr-2-cc0.mp3` from Freesound (CC0): https://freesound.org/people/soundofsong/sounds/650575/
+- `attached_assets/dog-bark-1-cc0.mp3` from Freesound (CC0): https://freesound.org/people/qubodup/sounds/813120/
+- `attached_assets/dog-bark-2-cc0.mp3` from Freesound (CC0): https://freesound.org/people/MWF77/sounds/788196/
+- `attached_assets/dog-whine-1-cc0.mp3` from Freesound (CC0): https://freesound.org/people/Breviceps/sounds/462660/
+- `attached_assets/dog-whine-2-cc0.mp3` from Freesound (CC0): https://freesound.org/people/T_saurus/sounds/742053/
+- `attached_assets/dog-howl-1-cc0.mp3` from Freesound (CC0): https://freesound.org/people/simcotter/sounds/115357/
+- `attached_assets/dog-howl-2-cc0.mp3` from Freesound (CC0): https://freesound.org/people/chris5s/sounds/835850/
+- `attached_assets/dog-pant-1-cc0.mp3` from Freesound (CC0): https://freesound.org/people/PanFlutist/sounds/724909/
+- `attached_assets/dog-pant-2-cc0.mp3` from Freesound (CC0): https://freesound.org/people/qubodup/sounds/827433/
 
 ## Requirements
 - Node.js 20+
