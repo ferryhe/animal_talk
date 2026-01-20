@@ -68,61 +68,89 @@ export function ListenInterface({ language, animal }: ListenInterfaceProps) {
   }, []);
 
   return (
-    <div className="flex flex-col items-center justify-center w-full space-y-8 min-h-[60vh]">
+    <div className="flex flex-col items-center justify-center w-full space-y-6 min-h-[60vh]">
       
-      {/* Mascot Area */}
-      <motion.div 
-        layout
-        className="relative w-64 h-64 md:w-80 md:h-80 flex items-center justify-center"
-      >
-        <AnimatePresence mode="wait">
-          {!results ? (
-            <motion.div
-              key={`mascot-${animal}`}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="relative z-10"
+      {/* Mascot Area - Clickable Round Image */}
+      <AnimatePresence mode="wait">
+        {!results ? (
+          <motion.div 
+            key={`mascot-${animal}`}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="relative flex flex-col items-center gap-4"
+          >
+            {/* Listening Ripple Effect */}
+            {isListening && (
+              <div className="absolute inset-0 z-0 w-56 h-56 md:w-72 md:h-72">
+                {[...Array(3)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute inset-0 rounded-full border-2 border-primary/40"
+                    animate={{
+                      scale: [1, 1.6],
+                      opacity: [0.6, 0],
+                    }}
+                    transition={{
+                      duration: 1.5,
+                      repeat: Infinity,
+                      delay: i * 0.5,
+                      ease: "easeOut",
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Round Clickable Mascot */}
+            <motion.button
+              onClick={isListening ? stopListening : startListening}
+              whileTap={{ scale: 0.92, y: 8 }}
+              whileHover={{ scale: 1.02 }}
+              className={`
+                relative z-10 w-56 h-56 md:w-72 md:h-72 rounded-full overflow-hidden
+                shadow-2xl cursor-pointer transition-all duration-200
+                border-4 ${isListening ? 'border-primary shadow-primary/30' : 'border-white/50'}
+                ${isListening ? 'shadow-[0_0_40px_rgba(var(--primary),0.3)]' : ''}
+              `}
+              style={{
+                background: 'linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--background)) 100%)'
+              }}
             >
-              <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent z-20 h-full w-full opacity-20" />
               <img 
                 src={mascotImage} 
                 alt={animal === 'guinea_pig' ? "Cute Guinea Pig" : "Cute Cat"} 
-                className="w-full h-full object-contain drop-shadow-2xl"
+                className="w-full h-full object-cover"
               />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="results-spacer"
-              className="h-20"
-            />
-          )}
-        </AnimatePresence>
+              
+              {/* Overlay when listening */}
+              {isListening && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="absolute inset-0 bg-primary/20 flex items-center justify-center"
+                >
+                  <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center">
+                    <X className="w-8 h-8 text-destructive" />
+                  </div>
+                </motion.div>
+              )}
+            </motion.button>
 
-        {/* Listening Ripple Effect */}
-        {isListening && (
-          <div className="absolute inset-0 z-0">
-            {[...Array(3)].map((_, i) => (
-              <motion.div
-                key={i}
-                className="absolute inset-0 rounded-full border-2 border-primary/30"
-                animate={{
-                  scale: [1, 1.5],
-                  opacity: [0.5, 0],
-                }}
-                transition={{
-                  duration: 1.5,
-                  repeat: Infinity,
-                  delay: i * 0.5,
-                  ease: "easeOut",
-                }}
-              />
-            ))}
-          </div>
+            {/* Audio Visualizer */}
+            <div className="h-12 flex items-center justify-center w-full">
+              {isListening && <AudioVisualizer isListening={true} />}
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="results-spacer"
+            className="h-10"
+          />
         )}
-      </motion.div>
+      </AnimatePresence>
 
-      {/* Action Area */}
+      {/* Text Prompt Area */}
       <AnimatePresence mode="wait">
         {!results ? (
           <motion.div 
@@ -130,55 +158,20 @@ export function ListenInterface({ language, animal }: ListenInterfaceProps) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="flex flex-col items-center gap-6 w-full"
+            className="flex flex-col items-center gap-2 w-full text-center"
           >
-            <div className="text-center space-y-2">
-              <h1 className="text-3xl font-bold text-foreground">
-                {language === 'en' ? `What's your ${animalName} saying?` : `你的${animalName}在说什么？`}
-              </h1>
-              <p className="text-muted-foreground">
-                {language === 'en' 
-                  ? "Tap the button to listen and translate" 
-                  : "点击按钮开始聆听并翻译"}
-              </p>
-            </div>
-
-            <div className="h-16 flex items-center justify-center w-full">
-              {isListening ? (
-                <AudioVisualizer isListening={true} />
-              ) : (
-                <div className="h-16" /> 
-              )}
-            </div>
-
-            <Button
-              size="lg"
-              className={`
-                w-24 h-24 rounded-full shadow-xl transition-all duration-300
-                flex items-center justify-center
-                ${isListening 
-                  ? "bg-destructive hover:bg-destructive/90 animate-pulse" 
-                  : "bg-primary hover:bg-primary/90 hover:scale-105"
-                }
-              `}
-              onClick={isListening ? stopListening : startListening}
-            >
-              {isListening ? (
-                <X className="w-10 h-10 text-white" />
-              ) : (
-                <Mic className="w-10 h-10 text-white" />
-              )}
-            </Button>
-            
-            {isListening && (
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-primary font-medium"
-              >
-                {language === 'en' ? "Listening..." : "正在聆听..."}
-              </motion.p>
-            )}
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+              {isListening 
+                ? (language === 'en' ? "Listening..." : "正在聆听...")
+                : (language === 'en' ? `What's your ${animalName} saying?` : `你的${animalName}在说什么？`)
+              }
+            </h1>
+            <p className="text-muted-foreground">
+              {isListening 
+                ? (language === 'en' ? "Tap the image to stop" : "点击图片停止") 
+                : (language === 'en' ? "Tap the image to start listening" : "点击图片开始聆听")
+              }
+            </p>
           </motion.div>
         ) : (
           <motion.div
