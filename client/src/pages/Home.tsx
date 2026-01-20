@@ -49,8 +49,18 @@ export default function Home() {
     setIsListening(false);
   };
 
-  const handleConfirm = (sound: SoundDefinition) => {
-    setHistory(prev => [sound, ...prev]);
+  const handleConfirm = (sound: SoundDefinition | null) => {
+    if (sound) {
+      setHistory(prev => [sound, ...prev]);
+    } else {
+      // Logic for un-confirming: remove the last added item if it matches? 
+      // For now, let's just not add to history if cancelled. 
+      // If we want to strictly remove the *last* action, we could pop from history.
+      // But user might have done other things. 
+      // A simple approach: remove the most recent entry from history 
+      // (assuming it was the one just added).
+      setHistory(prev => prev.slice(1));
+    }
   };
 
   // Cleanup timeout

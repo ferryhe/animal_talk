@@ -9,15 +9,20 @@ import { motion, AnimatePresence } from "framer-motion";
 interface TranslationResultProps {
   results: SoundDefinition[];
   language: 'en' | 'zh';
-  onConfirm: (sound: SoundDefinition) => void;
+  onConfirm: (sound: SoundDefinition | null) => void;
 }
 
 export function TranslationResult({ results, language, onConfirm }: TranslationResultProps) {
   const [confirmedId, setConfirmedId] = useState<string | null>(null);
 
   const handleConfirm = (sound: SoundDefinition) => {
-    setConfirmedId(sound.id);
-    onConfirm(sound);
+    if (confirmedId === sound.id) {
+      setConfirmedId(null);
+      onConfirm(null);
+    } else {
+      setConfirmedId(sound.id);
+      onConfirm(sound);
+    }
   };
 
   return (
@@ -77,7 +82,6 @@ export function TranslationResult({ results, language, onConfirm }: TranslationR
                   isConfirmed ? "bg-green-500 hover:bg-green-600 text-white border-transparent" : "hover:text-primary hover:border-primary/50"
                 )}
                 onClick={() => handleConfirm(sound)}
-                disabled={!!confirmedId}
               >
                 {isConfirmed ? (
                   <>
