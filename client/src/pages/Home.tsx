@@ -1,9 +1,22 @@
 import { useState } from "react";
-import { Volume2 } from "lucide-react";
+import { Volume2, ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import useEmblaCarousel from "embla-carousel-react";
 import { ListenInterface } from "@/components/ListenInterface";
 import { SayInterface } from "@/components/SayInterface";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+type Animal = 'guinea_pig' | 'cat';
+
+const ANIMALS: { id: Animal; name: string; name_zh: string; emoji: string }[] = [
+  { id: 'guinea_pig', name: 'Guinea Pig', name_zh: '豚鼠', emoji: '🐹' },
+  { id: 'cat', name: 'Cat', name_zh: '猫', emoji: '🐱' },
+];
 
 // Simple switch for language
 function LanguageSwitch({ current, onChange }: { current: 'en' | 'zh', onChange: (lang: 'en' | 'zh') => void }) {
@@ -31,8 +44,51 @@ function LanguageSwitch({ current, onChange }: { current: 'en' | 'zh', onChange:
   );
 }
 
+// Animal switcher dropdown
+function AnimalSwitcher({ 
+  current, 
+  onChange, 
+  language 
+}: { 
+  current: Animal; 
+  onChange: (animal: Animal) => void;
+  language: 'en' | 'zh';
+}) {
+  const currentAnimal = ANIMALS.find(a => a.id === current)!;
+  
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger className="flex items-center gap-2 hover:bg-muted/50 px-2 py-1 rounded-lg transition-colors">
+        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-lg">
+          {currentAnimal.emoji}
+        </div>
+        <span className="font-display font-bold text-lg tracking-tight">
+          {current === 'guinea_pig' ? 'WheekTalk' : 'MeowTalk'}
+        </span>
+        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-48">
+        {ANIMALS.map((animal) => (
+          <DropdownMenuItem
+            key={animal.id}
+            onClick={() => onChange(animal.id)}
+            className="flex items-center justify-between cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{animal.emoji}</span>
+              <span>{language === 'en' ? animal.name : animal.name_zh}</span>
+            </div>
+            {current === animal.id && <Check className="w-4 h-4 text-primary" />}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export default function Home() {
   const [language, setLanguage] = useState<'en' | 'zh'>('zh');
+  const [animal, setAnimal] = useState<Animal>('guinea_pig');
   const [activeTab, setActiveTab] = useState<'listen' | 'say'>('listen');
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false });
 
@@ -56,12 +112,7 @@ export default function Home() {
 
       {/* Header */}
       <header className="fixed top-0 left-0 w-full p-4 flex justify-between items-center z-50 bg-background/80 backdrop-blur-sm border-b border-border/50">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white">
-            <Volume2 className="w-5 h-5" />
-          </div>
-          <span className="font-display font-bold text-lg tracking-tight">WheekTalk</span>
-        </div>
+        <AnimalSwitcher current={animal} onChange={setAnimal} language={language} />
         <LanguageSwitch current={language} onChange={setLanguage} />
       </header>
 
@@ -97,10 +148,10 @@ export default function Home() {
         <div className="overflow-hidden h-full" ref={emblaRef}>
           <div className="flex h-full touch-pan-y">
             <div className="flex-[0_0_100%] min-w-0 pl-4 pr-4">
-              <ListenInterface language={language} />
+              <ListenInterface language={language} animal={animal} />
             </div>
             <div className="flex-[0_0_100%] min-w-0 pl-4 pr-4 overflow-y-auto">
-              <SayInterface language={language} />
+              <SayInterface language={language} animal={animal} />
             </div>
           </div>
         </div>

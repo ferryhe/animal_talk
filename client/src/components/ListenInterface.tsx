@@ -5,17 +5,25 @@ import { Button } from "@/components/ui/button";
 import { AudioVisualizer } from "@/components/AudioVisualizer";
 import { TranslationResult } from "@/components/TranslationResult";
 import { getRandomResult, SoundDefinition } from "@/lib/sounds";
-import mascotImage from "@assets/generated_images/cute_guinea_pig_mascot_listening_with_headphones.png";
+import { getRandomCatResult } from "@/lib/catSounds";
+import guineaPigMascot from "@assets/generated_images/cute_guinea_pig_mascot_listening_with_headphones.png";
+import catMascot from "@assets/generated_images/cute_cat_mascot_with_headphones.png";
 
 interface ListenInterfaceProps {
   language: 'en' | 'zh';
+  animal: 'guinea_pig' | 'cat';
 }
 
-export function ListenInterface({ language }: ListenInterfaceProps) {
+export function ListenInterface({ language, animal }: ListenInterfaceProps) {
   const [isListening, setIsListening] = useState(false);
   const [results, setResults] = useState<SoundDefinition[] | null>(null);
   const [history, setHistory] = useState<SoundDefinition[]>([]);
   const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
+  const mascotImage = animal === 'guinea_pig' ? guineaPigMascot : catMascot;
+  const animalName = animal === 'guinea_pig' 
+    ? (language === 'en' ? 'piggie' : '豚鼠')
+    : (language === 'en' ? 'cat' : '猫咪');
 
   const startListening = () => {
     if (isListening) return;
@@ -28,7 +36,7 @@ export function ListenInterface({ language }: ListenInterfaceProps) {
     
     timeoutRef.current = setTimeout(() => {
       setIsListening(false);
-      const newResults = getRandomResult();
+      const newResults = animal === 'guinea_pig' ? getRandomResult() : getRandomCatResult();
       setResults(newResults);
     }, duration);
   };
@@ -45,6 +53,12 @@ export function ListenInterface({ language }: ListenInterfaceProps) {
       setHistory(prev => prev.slice(1));
     }
   };
+
+  // Clear results and history when animal changes
+  useEffect(() => {
+    setResults(null);
+    setHistory([]);
+  }, [animal]);
 
   // Cleanup timeout
   useEffect(() => {
@@ -64,7 +78,7 @@ export function ListenInterface({ language }: ListenInterfaceProps) {
         <AnimatePresence mode="wait">
           {!results ? (
             <motion.div
-              key="mascot"
+              key={`mascot-${animal}`}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
@@ -73,14 +87,14 @@ export function ListenInterface({ language }: ListenInterfaceProps) {
               <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent z-20 h-full w-full opacity-20" />
               <img 
                 src={mascotImage} 
-                alt="Cute Guinea Pig" 
+                alt={animal === 'guinea_pig' ? "Cute Guinea Pig" : "Cute Cat"} 
                 className="w-full h-full object-contain drop-shadow-2xl"
               />
             </motion.div>
           ) : (
             <motion.div
               key="results-spacer"
-              className="h-20" // Collapse space when results show
+              className="h-20"
             />
           )}
         </AnimatePresence>
@@ -120,7 +134,7 @@ export function ListenInterface({ language }: ListenInterfaceProps) {
           >
             <div className="text-center space-y-2">
               <h1 className="text-3xl font-bold text-foreground">
-                {language === 'en' ? "What's your piggie saying?" : "你的豚鼠在说什么？"}
+                {language === 'en' ? `What's your ${animalName} saying?` : `你的${animalName}在说什么？`}
               </h1>
               <p className="text-muted-foreground">
                 {language === 'en' 
