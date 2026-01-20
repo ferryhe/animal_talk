@@ -11,11 +11,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-type Animal = 'guinea_pig' | 'cat';
+type Animal = 'guinea_pig' | 'cat' | 'dog';
 
-const ANIMALS: { id: Animal; name: string; name_zh: string; emoji: string }[] = [
-  { id: 'guinea_pig', name: 'Guinea Pig', name_zh: '豚鼠', emoji: '🐹' },
-  { id: 'cat', name: 'Cat', name_zh: '猫', emoji: '🐱' },
+const ANIMALS: { id: Animal; name: string; name_zh: string; emoji: string; appName: string }[] = [
+  { id: 'guinea_pig', name: 'Guinea Pig', name_zh: '豚鼠', emoji: '🐹', appName: 'WheekTalk' },
+  { id: 'cat', name: 'Cat', name_zh: '猫', emoji: '🐱', appName: 'MeowTalk' },
+  { id: 'dog', name: 'Dog', name_zh: '狗', emoji: '🐕', appName: 'BarkTalk' },
 ];
 
 // Simple switch for language
@@ -63,7 +64,7 @@ function AnimalSwitcher({
           {currentAnimal.emoji}
         </div>
         <span className="font-display font-bold text-lg tracking-tight">
-          {current === 'guinea_pig' ? 'WheekTalk' : 'MeowTalk'}
+          {currentAnimal.appName}
         </span>
         <ChevronDown className="w-4 h-4 text-muted-foreground" />
       </DropdownMenuTrigger>

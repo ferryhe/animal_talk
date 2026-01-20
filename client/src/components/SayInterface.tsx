@@ -4,34 +4,35 @@ import { Button } from "@/components/ui/button";
 import { Volume2, Music, Play } from "lucide-react";
 import { SOUND_LIBRARY, SoundDefinition } from "@/lib/sounds";
 import { CAT_SOUND_LIBRARY } from "@/lib/catSounds";
+import { DOG_SOUND_LIBRARY } from "@/lib/dogSounds";
 import { playGuineaPigSound } from "@/lib/audio";
 import { playCatSound } from "@/lib/catAudio";
+import { playDogSound } from "@/lib/dogAudio";
 import { cn } from "@/lib/utils";
 
 interface SayInterfaceProps {
   language: 'en' | 'zh';
-  animal: 'guinea_pig' | 'cat';
+  animal: 'guinea_pig' | 'cat' | 'dog';
 }
+
+const ANIMAL_CONFIG = {
+  guinea_pig: { library: SOUND_LIBRARY, playSound: playGuineaPigSound, name_en: 'Guinea Pig', name_zh: '豚鼠' },
+  cat: { library: CAT_SOUND_LIBRARY, playSound: playCatSound, name_en: 'Cat', name_zh: '猫' },
+  dog: { library: DOG_SOUND_LIBRARY, playSound: playDogSound, name_en: 'Dog', name_zh: '狗' },
+};
 
 export function SayInterface({ language, animal }: SayInterfaceProps) {
   const [playingId, setPlayingId] = useState<string | null>(null);
 
-  const soundLibrary = animal === 'guinea_pig' ? SOUND_LIBRARY : CAT_SOUND_LIBRARY;
-  const animalName = animal === 'guinea_pig'
-    ? (language === 'en' ? 'Guinea Pig' : '豚鼠')
-    : (language === 'en' ? 'Cat' : '猫');
+  const config = ANIMAL_CONFIG[animal];
+  const soundLibrary = config.library;
+  const animalName = language === 'en' ? config.name_en : config.name_zh;
 
   const playSound = async (sound: SoundDefinition) => {
     if (playingId) return;
 
     setPlayingId(sound.id);
-    
-    // Play the appropriate animal sound
-    if (animal === 'guinea_pig') {
-      await playGuineaPigSound(sound.id);
-    } else {
-      await playCatSound(sound.id);
-    }
+    await config.playSound(sound.id);
     setPlayingId(null);
   };
 

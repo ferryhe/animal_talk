@@ -6,13 +6,21 @@ import { AudioVisualizer } from "@/components/AudioVisualizer";
 import { TranslationResult } from "@/components/TranslationResult";
 import { getRandomResult, SoundDefinition } from "@/lib/sounds";
 import { getRandomCatResult } from "@/lib/catSounds";
+import { getRandomDogResult } from "@/lib/dogSounds";
 import guineaPigMascot from "@assets/generated_images/cute_guinea_pig_mascot_listening_with_headphones.png";
 import catMascot from "@assets/generated_images/cute_cat_mascot_with_headphones.png";
+import dogMascot from "@assets/generated_images/cute_dog_mascot_with_headphones.png";
 
 interface ListenInterfaceProps {
   language: 'en' | 'zh';
-  animal: 'guinea_pig' | 'cat';
+  animal: 'guinea_pig' | 'cat' | 'dog';
 }
+
+const ANIMAL_CONFIG = {
+  guinea_pig: { mascot: guineaPigMascot, name_en: 'piggie', name_zh: '豚鼠', getResults: getRandomResult },
+  cat: { mascot: catMascot, name_en: 'cat', name_zh: '猫咪', getResults: getRandomCatResult },
+  dog: { mascot: dogMascot, name_en: 'dog', name_zh: '狗狗', getResults: getRandomDogResult },
+};
 
 export function ListenInterface({ language, animal }: ListenInterfaceProps) {
   const [isListening, setIsListening] = useState(false);
@@ -20,10 +28,9 @@ export function ListenInterface({ language, animal }: ListenInterfaceProps) {
   const [history, setHistory] = useState<SoundDefinition[]>([]);
   const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
-  const mascotImage = animal === 'guinea_pig' ? guineaPigMascot : catMascot;
-  const animalName = animal === 'guinea_pig' 
-    ? (language === 'en' ? 'piggie' : '豚鼠')
-    : (language === 'en' ? 'cat' : '猫咪');
+  const config = ANIMAL_CONFIG[animal];
+  const mascotImage = config.mascot;
+  const animalName = language === 'en' ? config.name_en : config.name_zh;
 
   const startListening = () => {
     if (isListening) return;
@@ -36,7 +43,7 @@ export function ListenInterface({ language, animal }: ListenInterfaceProps) {
     
     timeoutRef.current = setTimeout(() => {
       setIsListening(false);
-      const newResults = animal === 'guinea_pig' ? getRandomResult() : getRandomCatResult();
+      const newResults = config.getResults();
       setResults(newResults);
     }, duration);
   };
