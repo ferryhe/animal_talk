@@ -22,6 +22,9 @@ an Express server in development and production.
 - `script/build.ts`: build pipeline (Vite + esbuild)
 - `attached_assets/`: mascot imagery
 
+## Third-party assets
+- `attached_assets/guinea-pigs-cc0.mp3` from Freesound (CC0): https://freesound.org/people/Breviceps/sounds/540477/
+
 ## Requirements
 - Node.js 20+
 - npm 9+ (comes with Node)
