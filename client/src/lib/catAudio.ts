@@ -1,12 +1,106 @@
+import catMeowOneUrl from "@assets/cat-meow-1-cc0.mp3";
+import catMeowTwoUrl from "@assets/cat-meow-2-cc0.mp3";
+import catPurrOneUrl from "@assets/cat-purr-1-cc0.mp3";
+import catPurrTwoUrl from "@assets/cat-purr-2-cc0.mp3";
+
 // Cat sound synthesizer using Web Audio API
 
 let audioContext: AudioContext | null = null;
+const sampleBufferCache = new Map<string, Promise<AudioBuffer>>();
+
+const SAMPLE_PROFILES: Record<
+  string,
+  {
+    urls: string[];
+    startRatio: [number, number];
+    duration: [number, number];
+    playbackRate: [number, number];
+    gain: number;
+  }
+> = {
+  meow: {
+    urls: [catMeowOneUrl, catMeowTwoUrl],
+    startRatio: [0.0, 0.5],
+    duration: [0.25, 0.6],
+    playbackRate: [0.95, 1.2],
+    gain: 0.28,
+  },
+  purr_cat: {
+    urls: [catPurrOneUrl, catPurrTwoUrl],
+    startRatio: [0.0, 0.6],
+    duration: [1.1, 2.0],
+    playbackRate: [0.85, 1.05],
+    gain: 0.22,
+  },
+  yowl: {
+    urls: [catMeowOneUrl, catMeowTwoUrl],
+    startRatio: [0.0, 0.5],
+    duration: [0.5, 1.0],
+    playbackRate: [0.8, 1.0],
+    gain: 0.2,
+  },
+};
+
+function randomBetween(min: number, max: number) {
+  return min + Math.random() * (max - min);
+}
 
 function getAudioContext(): AudioContext {
   if (!audioContext) {
     audioContext = new AudioContext();
   }
   return audioContext;
+}
+
+function getSampleBuffer(url: string): Promise<AudioBuffer> {
+  const existing = sampleBufferCache.get(url);
+  if (existing) {
+    return existing;
+  }
+
+  const promise = (async () => {
+    const ctx = getAudioContext();
+    const response = await fetch(url);
+    const data = await response.arrayBuffer();
+    return await ctx.decodeAudioData(data);
+  })().catch((error) => {
+    sampleBufferCache.delete(url);
+    throw error;
+  });
+
+  sampleBufferCache.set(url, promise);
+  return promise;
+}
+
+async function playSampleLayer(soundId: string) {
+  const profile = SAMPLE_PROFILES[soundId];
+  if (!profile) return;
+
+  try {
+    const ctx = getAudioContext();
+    const url = profile.urls[Math.floor(Math.random() * profile.urls.length)];
+    const buffer = await getSampleBuffer(url);
+    const duration = randomBetween(profile.duration[0], profile.duration[1]);
+    const maxStart = Math.max(0, buffer.duration - duration);
+    const startRatio = randomBetween(profile.startRatio[0], profile.startRatio[1]);
+    const start = Math.min(startRatio * buffer.duration, maxStart);
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.playbackRate.setValueAtTime(
+      randomBetween(profile.playbackRate[0], profile.playbackRate[1]),
+      ctx.currentTime,
+    );
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(profile.gain, ctx.currentTime);
+
+    source.connect(gain);
+    gain.connect(ctx.destination);
+    source.start(ctx.currentTime, start, duration);
+  } catch {
+    // Ignore sample errors and fall back to synth-only output.
+  }
 }
 
 // Generate a meow sound
@@ -177,10 +271,12 @@ export function playCatSound(soundId: string): Promise<void> {
   return new Promise((resolve) => {
     switch (soundId) {
       case 'meow':
+        void playSampleLayer(soundId);
         playMeow();
         setTimeout(resolve, 1000);
         break;
       case 'purr_cat':
+        void playSampleLayer(soundId);
         playCatPurr();
         setTimeout(resolve, 2000);
         break;
@@ -193,6 +289,7 @@ export function playCatSound(soundId: string): Promise<void> {
         setTimeout(resolve, 800);
         break;
       case 'yowl':
+        void playSampleLayer(soundId);
         playYowl();
         setTimeout(resolve, 2200);
         break;

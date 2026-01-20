@@ -24,6 +24,10 @@ an Express server in development and production.
 
 ## Third-party assets
 - `attached_assets/guinea-pigs-cc0.mp3` from Freesound (CC0): https://freesound.org/people/Breviceps/sounds/540477/
+- `attached_assets/cat-meow-1-cc0.mp3` from Freesound (CC0): https://freesound.org/people/qubodup/sounds/813119/
+- `attached_assets/cat-meow-2-cc0.mp3` from Freesound (CC0): https://freesound.org/people/qubodup/sounds/813113/
+- `attached_assets/cat-purr-1-cc0.mp3` from Freesound (CC0): https://freesound.org/people/rareguy27/sounds/690620/
+- `attached_assets/cat-purr-2-cc0.mp3` from Freesound (CC0): https://freesound.org/people/soundofsong/sounds/650575/
 
 ## Requirements
 - Node.js 20+
