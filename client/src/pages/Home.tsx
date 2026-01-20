@@ -8,16 +8,31 @@ import { TranslationResult } from "@/components/TranslationResult";
 import { getRandomResult, SoundDefinition } from "@/lib/sounds";
 import mascotImage from "@assets/generated_images/cute_guinea_pig_mascot_listening_with_headphones.png";
 
+import { cn } from "@/lib/utils";
+
 // Simple switch for language
 function LanguageSwitch({ current, onChange }: { current: 'en' | 'zh', onChange: (lang: 'en' | 'zh') => void }) {
   return (
-    <button 
-      onClick={() => onChange(current === 'en' ? 'zh' : 'en')}
-      className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/50 hover:bg-white border border-transparent hover:border-border transition-all text-sm font-medium text-muted-foreground hover:text-foreground"
-    >
-      <Globe className="w-4 h-4" />
-      {current === 'en' ? 'EN / 中文' : '中文 / EN'}
-    </button>
+    <div className="flex bg-muted/50 p-1 rounded-full border border-border/50">
+      <button
+        onClick={() => onChange('en')}
+        className={cn(
+          "px-4 py-1.5 rounded-full text-sm font-bold transition-all",
+          current === 'en' ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"
+        )}
+      >
+        EN
+      </button>
+      <button
+        onClick={() => onChange('zh')}
+        className={cn(
+          "px-4 py-1.5 rounded-full text-sm font-bold transition-all",
+          current === 'zh' ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"
+        )}
+      >
+        中
+      </button>
+    </div>
   );
 }
 
