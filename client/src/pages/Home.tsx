@@ -246,7 +246,7 @@ export default function Home() {
               {history.slice(0, 3).map((item, i) => (
                 <div key={i} className="p-4 flex items-center justify-between">
                   <div>
-                    <p className="font-bold text-sm">{language === 'en' ? item.name : item.translations.zh.split('/')[0]}</p>
+                    <p className="font-bold text-sm">{language === 'en' ? item.name : item.name_zh}</p>
                     <p className="text-xs text-muted-foreground truncate max-w-[200px]">
                       {language === 'en' ? item.translations.en : item.translations.zh}
                     </p>

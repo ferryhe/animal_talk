@@ -1,6 +1,7 @@
 export interface SoundDefinition {
   id: string;
   name: string;
+  name_zh: string;
   description: string;
   translations: {
     en: string;
@@ -17,6 +18,7 @@ export const SOUND_LIBRARY: SoundDefinition[] = [
   {
     id: 'wheek',
     name: 'Wheek',
+    name_zh: '尖叫 (求食声)',
     description: 'A loud, long whistle',
     translations: {
       en: "Feed me! / I'm excited!",
@@ -30,6 +32,7 @@ export const SOUND_LIBRARY: SoundDefinition[] = [
   {
     id: 'purr',
     name: 'Purr',
+    name_zh: '咕噜声',
     description: 'Deep, vibrating sound',
     translations: {
       en: "I'm happy / Content",
@@ -43,6 +46,7 @@ export const SOUND_LIBRARY: SoundDefinition[] = [
   {
     id: 'rumble',
     name: 'Rumble',
+    name_zh: '隆隆声 (宣示主权)',
     description: 'Low, vibrating purr with hip swaying',
     translations: {
       en: "I'm the boss (Dominance)",
@@ -56,6 +60,7 @@ export const SOUND_LIBRARY: SoundDefinition[] = [
   {
     id: 'chut',
     name: 'Chutting',
+    name_zh: '嗒嗒声 (探索)',
     description: 'Short, quiet staccato sounds',
     translations: {
       en: "Curious / Exploring",
@@ -69,6 +74,7 @@ export const SOUND_LIBRARY: SoundDefinition[] = [
   {
     id: 'chatter',
     name: 'Teeth Chattering',
+    name_zh: '磨牙声 (警告)',
     description: 'Rapid clicking of teeth',
     translations: {
       en: "Back off! (Warning)",
@@ -82,6 +88,7 @@ export const SOUND_LIBRARY: SoundDefinition[] = [
   {
     id: 'whine',
     name: 'Whine',
+    name_zh: '呜咽声',
     description: 'High-pitched moan',
     translations: {
       en: "I'm annoyed / Dislike this",

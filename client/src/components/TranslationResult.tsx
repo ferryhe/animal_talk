@@ -50,7 +50,7 @@ export function TranslationResult({ results, language, onConfirm }: TranslationR
             <div className="flex justify-between items-start mb-2">
               <div>
                 <h3 className={cn("font-bold", isTop ? "text-xl text-primary" : "text-lg text-foreground/80")}>
-                  {language === 'en' ? sound.name : sound.translations.zh.split('/')[0]} 
+                  {language === 'en' ? sound.name : sound.name_zh} 
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1">
                   {language === 'en' ? sound.context.en : sound.context.zh}
