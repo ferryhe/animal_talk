@@ -5,7 +5,7 @@ play back animal vocalizations. It ships as a React + Vite frontend served by
 an Express server in development and production.
 
 ## What it does
-- Listen mode simulates translating animal sounds into human-friendly phrases.
+- Listen mode uses lightweight, rule-based microphone analysis with a simulated fallback.
 - Say mode plays synthesized animal sounds using the Web Audio API.
 - Switch between guinea pig, cat, and dog sound libraries.
 - Toggle English/Chinese UI text.
@@ -109,6 +109,26 @@ This serves both the API (if you add routes) and the client.
 
 Static hosting is enough for the current app because there are no API routes
 yet. If you add `/api` routes, use the Node server deployment instead.
+
+### Option 3: EC2 + Docker + Caddy
+This keeps the app containerized and uses Caddy as a reverse proxy with HTTPS.
+
+1. On your EC2 instance, install Docker and Docker Compose.
+2. Open inbound ports 80 and 443 in your security group.
+3. Set a DNS A record for your domain to the EC2 public IP (if you want HTTPS).
+4. Update the Caddyfile:
+   - For a domain, replace `:80` with `yourdomain.com`.
+5. Build and run:
+   ```bash
+   docker compose up -d --build
+   ```
+
+Optional environment variables (set in `docker-compose.yml`):
+- `DATABASE_URL` if you want to use Drizzle migrations.
+
+Notes:
+- Microphone access in browsers requires HTTPS, so use a real domain + Caddy TLS
+  if you plan to use Listen mode in production.
 
 ## Adding API routes
 Add Express routes in `server/routes.ts` under the `/api` prefix. The server

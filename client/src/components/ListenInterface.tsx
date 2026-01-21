@@ -4,9 +4,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { AudioVisualizer } from "@/components/AudioVisualizer";
 import { TranslationResult } from "@/components/TranslationResult";
-import { getRandomGuineaPigResult, SoundDefinition } from "@/lib/guineaPigSounds";
-import { getRandomCatResult } from "@/lib/catSounds";
-import { getRandomDogResult } from "@/lib/dogSounds";
+import {
+  GUINEA_PIG_SOUND_LIBRARY,
+  getRandomGuineaPigResult,
+  SoundDefinition,
+} from "@/lib/guineaPigSounds";
+import { CAT_SOUND_LIBRARY, getRandomCatResult } from "@/lib/catSounds";
+import { DOG_SOUND_LIBRARY, getRandomDogResult } from "@/lib/dogSounds";
+import { recognizeAnimalSounds } from "@/lib/audioRecognition";
 import guineaPigMascot from "@assets/generated_images/cute_guinea_pig_mascot_listening_with_headphones.png";
 import catMascot from "@assets/generated_images/cute_cat_mascot_with_headphones.png";
 import dogMascot from "@assets/generated_images/cute_dog_mascot_with_headphones.png";
@@ -17,39 +22,72 @@ interface ListenInterfaceProps {
 }
 
 const ANIMAL_CONFIG = {
-  guinea_pig: { mascot: guineaPigMascot, name_en: 'piggie', name_zh: '豚鼠', getResults: getRandomGuineaPigResult },
-  cat: { mascot: catMascot, name_en: 'cat', name_zh: '猫咪', getResults: getRandomCatResult },
-  dog: { mascot: dogMascot, name_en: 'dog', name_zh: '狗狗', getResults: getRandomDogResult },
+  guinea_pig: {
+    mascot: guineaPigMascot,
+    name_en: 'piggie',
+    name_zh: '豚鼠',
+    library: GUINEA_PIG_SOUND_LIBRARY,
+    getFallbackResults: getRandomGuineaPigResult,
+  },
+  cat: {
+    mascot: catMascot,
+    name_en: 'cat',
+    name_zh: '猫咪',
+    library: CAT_SOUND_LIBRARY,
+    getFallbackResults: getRandomCatResult,
+  },
+  dog: {
+    mascot: dogMascot,
+    name_en: 'dog',
+    name_zh: '狗狗',
+    library: DOG_SOUND_LIBRARY,
+    getFallbackResults: getRandomDogResult,
+  },
 };
 
 export function ListenInterface({ language, animal }: ListenInterfaceProps) {
   const [isListening, setIsListening] = useState(false);
   const [results, setResults] = useState<SoundDefinition[] | null>(null);
   const [history, setHistory] = useState<SoundDefinition[]>([]);
-  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const abortRef = useRef<AbortController | null>(null);
 
   const config = ANIMAL_CONFIG[animal];
   const mascotImage = config.mascot;
   const animalName = language === 'en' ? config.name_en : config.name_zh;
 
-  const startListening = () => {
+  const startListening = async () => {
     if (isListening) return;
     
     setResults(null);
     setIsListening(true);
     
-    // Simulate listening duration (2-4 seconds)
     const duration = Math.random() * 2000 + 2000;
-    
-    timeoutRef.current = setTimeout(() => {
-      setIsListening(false);
-      const newResults = config.getResults();
-      setResults(newResults);
-    }, duration);
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const newResults = await recognizeAnimalSounds(
+        animal,
+        config.library,
+        { durationMs: duration, signal: controller.signal },
+      );
+      if (abortRef.current === controller && !controller.signal.aborted) {
+        setResults(newResults);
+      }
+    } catch {
+      if (abortRef.current === controller && !controller.signal.aborted) {
+        setResults(config.getFallbackResults());
+      }
+    } finally {
+      if (abortRef.current === controller) {
+        setIsListening(false);
+      }
+    }
   };
 
   const stopListening = () => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    abortRef.current?.abort();
+    abortRef.current = null;
     setIsListening(false);
   };
 
@@ -63,14 +101,18 @@ export function ListenInterface({ language, animal }: ListenInterfaceProps) {
 
   // Clear results and history when animal changes
   useEffect(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsListening(false);
     setResults(null);
     setHistory([]);
   }, [animal]);
 
-  // Cleanup timeout
+  // Cleanup microphone analysis on unmount
   useEffect(() => {
     return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      abortRef.current?.abort();
+      abortRef.current = null;
     };
   }, []);
 
