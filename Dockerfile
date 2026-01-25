@@ -1,8 +1,8 @@
 FROM node:20-alpine AS build
 
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json package-lock.json* ./
+RUN npm install
 
 COPY . .
 RUN npm run build
@@ -13,8 +13,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=5000
 
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --prefer-offline --no-audit
+COPY package.json package-lock.json* ./
+RUN npm install --omit=dev --prefer-offline --no-audit
 COPY --from=build /app/dist ./dist
 
 EXPOSE 5000
