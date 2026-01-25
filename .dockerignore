@@ -42,9 +42,8 @@ Dockerfile
 docker-compose.yml
 .dockerignore
 
-# Scripts
+# Deployment scripts (keep build scripts)
 update.sh
-script/
 
 # Temporary files
 *.tmp
