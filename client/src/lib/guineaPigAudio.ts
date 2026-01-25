@@ -1,25 +1,73 @@
-import guineaPigSampleUrl from "@assets/guinea-pigs-cc0.mp3";
+import guineaPigWheekOneUrl from "@assets/guinea-pig-wheek-1-cc0.mp3";
+import guineaPigWheekTwoUrl from "@assets/guinea-pig-wheek-2-cc0.mp3";
+import guineaPigPurrOneUrl from "@assets/guinea-pig-purr-1-cc0.mp3";
+import guineaPigPurrTwoUrl from "@assets/guinea-pig-purr-2-cc0.mp3";
+import guineaPigRumbleOneUrl from "@assets/guinea-pig-rumble-1-cc0.mp3";
+import guineaPigRumbleTwoUrl from "@assets/guinea-pig-rumble-2-cc0.mp3";
+import guineaPigChuttingOneUrl from "@assets/guinea-pig-chutting-1-cc0.mp3";
+import guineaPigChuttingTwoUrl from "@assets/guinea-pig-chutting-2-cc0.mp3";
+import guineaPigChatterOneUrl from "@assets/guinea-pig-chatter-1-cc0.mp3";
+import guineaPigChatterTwoUrl from "@assets/guinea-pig-chatter-2-cc0.mp3";
+import guineaPigWhineOneUrl from "@assets/guinea-pig-whine-1-cc0.mp3";
+import guineaPigWhineTwoUrl from "@assets/guinea-pig-whine-2-cc0.mp3";
 
 // Guinea pig sound synthesizer using Web Audio API
 
 let audioContext: AudioContext | null = null;
-let sampleBufferPromise: Promise<AudioBuffer> | null = null;
+const sampleBufferCache = new Map<string, Promise<AudioBuffer>>();
 
 const SAMPLE_PROFILES: Record<
   string,
   {
+    urls: string[];
     startRatio: [number, number];
     duration: [number, number];
     playbackRate: [number, number];
     gain: number;
   }
 > = {
-  wheek: { startRatio: [0.02, 0.18], duration: [0.4, 0.8], playbackRate: [1.1, 1.35], gain: 0.28 },
-  purr: { startRatio: [0.18, 0.45], duration: [1.0, 1.8], playbackRate: [0.85, 1.0], gain: 0.22 },
-  rumble: { startRatio: [0.35, 0.65], duration: [0.8, 1.4], playbackRate: [0.8, 0.95], gain: 0.2 },
-  chut: { startRatio: [0.4, 0.9], duration: [0.2, 0.45], playbackRate: [1.2, 1.5], gain: 0.2 },
-  chatter: { startRatio: [0.4, 0.9], duration: [0.25, 0.5], playbackRate: [1.25, 1.6], gain: 0.18 },
-  whine: { startRatio: [0.2, 0.75], duration: [0.6, 1.0], playbackRate: [0.95, 1.15], gain: 0.22 },
+  wheek: {
+    urls: [guineaPigWheekOneUrl, guineaPigWheekTwoUrl],
+    startRatio: [0.0, 0.4],
+    duration: [0.4, 0.8],
+    playbackRate: [1.1, 1.35],
+    gain: 0.28,
+  },
+  purr: {
+    urls: [guineaPigPurrOneUrl, guineaPigPurrTwoUrl],
+    startRatio: [0.0, 0.5],
+    duration: [1.0, 1.8],
+    playbackRate: [0.85, 1.0],
+    gain: 0.22,
+  },
+  rumble: {
+    urls: [guineaPigRumbleOneUrl, guineaPigRumbleTwoUrl],
+    startRatio: [0.0, 0.5],
+    duration: [0.8, 1.4],
+    playbackRate: [0.8, 0.95],
+    gain: 0.2,
+  },
+  chut: {
+    urls: [guineaPigChuttingOneUrl, guineaPigChuttingTwoUrl],
+    startRatio: [0.0, 0.0],
+    duration: [3.0, 3.0],
+    playbackRate: [1.0, 1.0],
+    gain: 3,
+  },
+  chatter: {
+    urls: [guineaPigChatterOneUrl, guineaPigChatterTwoUrl],
+    startRatio: [0.0, 0.3],
+    duration: [0.25, 0.5],
+    playbackRate: [1.25, 1.6],
+    gain: 0.18,
+  },
+  whine: {
+    urls: [guineaPigWhineOneUrl, guineaPigWhineTwoUrl],
+    startRatio: [0.0, 0.4],
+    duration: [0.6, 1.0],
+    playbackRate: [0.95, 1.15],
+    gain: 0.22,
+  },
 };
 
 function randomBetween(min: number, max: number) {
@@ -33,19 +81,22 @@ function getAudioContext(): AudioContext {
   return audioContext;
 }
 
-async function getSampleBuffer(): Promise<AudioBuffer> {
-  if (!sampleBufferPromise) {
-    sampleBufferPromise = (async () => {
-      const ctx = getAudioContext();
-      const response = await fetch(guineaPigSampleUrl);
-      const data = await response.arrayBuffer();
-      return await ctx.decodeAudioData(data);
-    })().catch((error) => {
-      sampleBufferPromise = null;
-      throw error;
-    });
+async function getSampleBuffer(url: string): Promise<AudioBuffer> {
+  if (!sampleBufferCache.has(url)) {
+    sampleBufferCache.set(
+      url,
+      (async () => {
+        const ctx = getAudioContext();
+        const response = await fetch(url);
+        const data = await response.arrayBuffer();
+        return await ctx.decodeAudioData(data);
+      })().catch((error) => {
+        sampleBufferCache.delete(url);
+        throw error;
+      }),
+    );
   }
-  return sampleBufferPromise;
+  return sampleBufferCache.get(url)!;
 }
 
 async function playSampleLayer(soundId: string) {
@@ -54,7 +105,8 @@ async function playSampleLayer(soundId: string) {
 
   try {
     const ctx = getAudioContext();
-    const buffer = await getSampleBuffer();
+    const url = profile.urls[Math.floor(Math.random() * profile.urls.length)];
+    const buffer = await getSampleBuffer(url);
     const duration = randomBetween(profile.duration[0], profile.duration[1]);
     const maxStart = Math.max(0, buffer.duration - duration);
     const startRatio = randomBetween(profile.startRatio[0], profile.startRatio[1]);
@@ -242,32 +294,26 @@ export function playGuineaPigSound(soundId: string): Promise<void> {
     switch (soundId) {
       case 'wheek':
         void playSampleLayer(soundId);
-        playWheek();
         setTimeout(resolve, 1500);
         break;
       case 'purr':
         void playSampleLayer(soundId);
-        playPurr();
         setTimeout(resolve, 2000);
         break;
       case 'rumble':
         void playSampleLayer(soundId);
-        playRumble();
         setTimeout(resolve, 2000);
         break;
       case 'chut':
         void playSampleLayer(soundId);
-        playChutting();
-        setTimeout(resolve, 1500);
+        setTimeout(resolve, 3000);
         break;
       case 'chatter':
         void playSampleLayer(soundId);
-        playTeethChatter();
         setTimeout(resolve, 1500);
         break;
       case 'whine':
         void playSampleLayer(soundId);
-        playWhine();
         setTimeout(resolve, 1800);
         break;
       default:

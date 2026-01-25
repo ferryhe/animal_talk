@@ -272,12 +272,10 @@ export function playCatSound(soundId: string): Promise<void> {
     switch (soundId) {
       case 'meow':
         void playSampleLayer(soundId);
-        playMeow();
         setTimeout(resolve, 1000);
         break;
       case 'purr_cat':
         void playSampleLayer(soundId);
-        playCatPurr();
         setTimeout(resolve, 2000);
         break;
       case 'hiss':
@@ -290,7 +288,6 @@ export function playCatSound(soundId: string): Promise<void> {
         break;
       case 'yowl':
         void playSampleLayer(soundId);
-        playYowl();
         setTimeout(resolve, 2200);
         break;
       case 'chatter_cat':

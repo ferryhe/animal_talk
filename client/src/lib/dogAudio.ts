@@ -292,12 +292,10 @@ export function playDogSound(soundId: string): Promise<void> {
     switch (soundId) {
       case 'bark':
         void playSampleLayer(soundId);
-        playBark();
         setTimeout(resolve, 1000);
         break;
       case 'whine_dog':
         void playSampleLayer(soundId);
-        playDogWhine();
         setTimeout(resolve, 1800);
         break;
       case 'growl':
@@ -306,7 +304,6 @@ export function playDogSound(soundId: string): Promise<void> {
         break;
       case 'howl':
         void playSampleLayer(soundId);
-        playHowl();
         setTimeout(resolve, 2800);
         break;
       case 'yip':
@@ -315,7 +312,6 @@ export function playDogSound(soundId: string): Promise<void> {
         break;
       case 'pant':
         void playSampleLayer(soundId);
-        playPant();
         setTimeout(resolve, 1800);
         break;
       default:
