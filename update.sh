@@ -31,9 +31,10 @@ docker network create caddy_network 2>/dev/null || echo "Network already exists"
 echo -e "${GREEN}✓ Network ready${NC}"
 
 # Step 3: Stop and remove existing containers
-echo -e "${BLUE}Step 3: Stopping existing containers...${NC}"
-docker compose down
-echo -e "${GREEN}✓ Containers stopped${NC}"
+echo -e "${BLUE}Step 3: Stopping and removing existing containers...${NC}"
+docker compose down --remove-orphans
+docker rm -f animal_talk-app 2>/dev/null || true
+echo -e "${GREEN}✓ Containers cleaned up${NC}"
 
 # Step 4: Remove old images (optional - uncomment to clean up old images)
 # echo -e "${BLUE}Step 4: Cleaning up old images...${NC}"
@@ -42,7 +43,7 @@ echo -e "${GREEN}✓ Containers stopped${NC}"
 
 # Step 5: Build and start containers
 echo -e "${BLUE}Step 4: Building and starting containers...${NC}"
-docker compose up -d --build
+docker compose up -d --build --force-recreate
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Containers started successfully${NC}"
 else
