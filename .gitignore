@@ -47,3 +47,6 @@ ENV/
 *.tar.gz
 .temp/
 vite.config.ts.*
+
+# wechat
+mp/
