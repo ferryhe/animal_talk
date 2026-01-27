@@ -2,6 +2,14 @@ import catMeowOneUrl from "@assets/cat-meow-1-cc0.mp3";
 import catMeowTwoUrl from "@assets/cat-meow-2-cc0.mp3";
 import catPurrOneUrl from "@assets/cat-purr-1-cc0.mp3";
 import catPurrTwoUrl from "@assets/cat-purr-2-cc0.mp3";
+import catChatteringOneUrl from "@assets/cat-chattering-1-cc0.mp3";
+import catChatteringTwoUrl from "@assets/cat-chattering-2-cc0.mp3";
+import catHissOneUrl from "@assets/cat-hiss-1-cc0.mp3";
+import catHissTwoUrl from "@assets/cat-hiss-2-cc0.mp3";
+import catChirpOneUrl from "@assets/cat-chirp-1-cc0.mp3";
+import catChirpTwoUrl from "@assets/cat-chirp-2-cc0.mp3";
+import catYowlOneUrl from "@assets/cat-yowl-1-cc0.mp3";
+import catYowlTwoUrl from "@assets/cat-yowl-2-cc0.mp3";
 
 // Cat sound synthesizer using Web Audio API
 
@@ -28,7 +36,7 @@ const SAMPLE_PROFILES: Record<
   purr_cat: {
     urls: [catPurrOneUrl, catPurrTwoUrl],
     startRatio: [0.0, 0.6],
-    duration: [1.1, 2.0],
+    duration: [6.3, 6.3],
     playbackRate: [0.85, 1.05],
     gain: 0.22,
   },
