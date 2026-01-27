@@ -1,7 +1,7 @@
 import guineaPigWheekOneUrl from "@assets/guinea-pig-wheek-1-cc0.mp3";
 import guineaPigWheekTwoUrl from "@assets/guinea-pig-wheek-2-cc0.mp3";
 import guineaPigPurrOneUrl from "@assets/guinea-pig-purr-1-cc0.mp3";
-import guineaPigPurrTwoUrl from "@assets/Guinea pig purring 2.mp3";
+import guineaPigPurrTwoUrl from "@assets/guinea-pig-purr-2-cc0.mp3";
 import guineaPigRumbleOneUrl from "@assets/guinea-pig-rumble-1-cc0.mp3";
 import guineaPigRumbleTwoUrl from "@assets/guinea-pig-rumble-2-cc0.mp3";
 import guineaPigChuttingOneUrl from "@assets/guinea-pig-chutting-1-cc0.mp3";
