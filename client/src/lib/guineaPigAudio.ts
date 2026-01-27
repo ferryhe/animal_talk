@@ -29,7 +29,7 @@ const SAMPLE_PROFILES: Record<
   wheek: {
     urls: [guineaPigWheekOneUrl, guineaPigWheekTwoUrl],
     startRatio: [0.0, 0.4],
-    duration: [1.8, 1.8],
+    duration: [3.5, 3.5],
     playbackRate: [1.1, 1.35],
     gain: 0.28,
   },
@@ -43,7 +43,7 @@ const SAMPLE_PROFILES: Record<
   rumble: {
     urls: [guineaPigRumbleOneUrl, guineaPigRumbleTwoUrl],
     startRatio: [0.0, 0.5],
-    duration: [0.8, 1.4],
+    duration: [6.5, 6.5],
     playbackRate: [0.8, 0.95],
     gain: 0.2,
   },
