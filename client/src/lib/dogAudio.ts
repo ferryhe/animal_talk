@@ -6,6 +6,12 @@ import dogHowlOneUrl from "@assets/dog-howl-1-cc0.mp3";
 import dogHowlTwoUrl from "@assets/dog-howl-2-cc0.mp3";
 import dogPantOneUrl from "@assets/dog-pant-1-cc0.mp3";
 import dogPantTwoUrl from "@assets/dog-pant-2-cc0.mp3";
+import dogHappyPantingOneUrl from "@assets/dog-happy-panting-1-cc0.mp3";
+import dogHappyPantingTwoUrl from "@assets/dog-happy-panting-2-cc0.mp3";
+import dogGrowlOneUrl from "@assets/dog-growl-1-cc0.mp3";
+import dogGrowlTwoUrl from "@assets/dog-growl-2-cc0.mp3";
+import dogYipOneUrl from "@assets/dog-yip-1-cc0.mp3";
+import dogYipTwoUrl from "@assets/dog-yip-2-cc0.mp3";
 
 // Dog sound synthesizer using Web Audio API
 
@@ -32,23 +38,44 @@ const SAMPLE_PROFILES: Record<
   whine_dog: {
     urls: [dogWhineOneUrl, dogWhineTwoUrl],
     startRatio: [0.0, 0.6],
-    duration: [0.5, 1.2],
+    duration: [4.6, 5.2],
     playbackRate: [0.9, 1.1],
     gain: 0.24,
   },
   howl: {
     urls: [dogHowlOneUrl, dogHowlTwoUrl],
     startRatio: [0.0, 0.6],
-    duration: [0.8, 1.6],
+    duration: [2.3, 6.3],
     playbackRate: [0.85, 1.05],
     gain: 0.22,
   },
   pant: {
     urls: [dogPantOneUrl, dogPantTwoUrl],
     startRatio: [0.0, 0.7],
-    duration: [0.5, 1.2],
+    duration: [5.4, 1.2],
     playbackRate: [0.9, 1.1],
     gain: 0.18,
+  },
+  happy_panting: {
+    urls: [dogHappyPantingOneUrl, dogHappyPantingTwoUrl],
+    startRatio: [0.0, 0.5],
+    duration: [2.0, 3.0],
+    playbackRate: [0.95, 1.15],
+    gain: 0.2,
+  },
+  growl: {
+    urls: [dogGrowlOneUrl, dogGrowlTwoUrl],
+    startRatio: [0.0, 0.4],
+    duration: [3.2, 4.0],
+    playbackRate: [0.9, 1.1],
+    gain: 0.22,
+  },
+  yip: {
+    urls: [dogYipOneUrl, dogYipTwoUrl],
+    startRatio: [0.0, 0.5],
+    duration: [0.6, 1.0],
+    playbackRate: [1.0, 1.3],
+    gain: 0.26,
   },
 };
 
