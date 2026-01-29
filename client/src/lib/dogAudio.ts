@@ -326,15 +326,15 @@ export function playDogSound(soundId: string): Promise<void> {
         setTimeout(resolve, 1800);
         break;
       case 'growl':
-        playGrowl();
-        setTimeout(resolve, 2000);
+        void playSampleLayer(soundId);
+        setTimeout(resolve, 4000);
         break;
       case 'howl':
         void playSampleLayer(soundId);
         setTimeout(resolve, 2800);
         break;
       case 'yip':
-        playYip();
+        void playSampleLayer(soundId);
         setTimeout(resolve, 1000);
         break;
       case 'pant':
