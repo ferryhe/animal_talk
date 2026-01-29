@@ -1,81 +1,70 @@
 #!/bin/bash
 
 # Animal Talk - EC2 Update and Deployment Script
-# This script pulls the latest code and restarts the Docker containers
+# 优化点：路径自适应、镜像自动清理、健康检查等待
 
-set -e  # Exit on error
+set -e 
+
+# 确保脚本在项目根目录下执行
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR"
 
 echo "=========================================="
 echo "Animal Talk - Updating..."
 echo "=========================================="
 
-# Colors for output
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 RED='\033[0;31m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Step 1: Pull latest code from Git
+# 1. 代码同步
 echo -e "${BLUE}Step 1: Pulling latest code from Git...${NC}"
 git pull origin main
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✓ Git pull completed successfully${NC}"
-else
-    echo -e "${RED}✗ Git pull failed${NC}"
-    exit 1
-fi
 
-# Step 2: Create shared network if it doesn't exist
+# 2. 网络检查
 echo -e "${BLUE}Step 2: Ensuring shared network exists...${NC}"
-docker network create caddy_network 2>/dev/null || echo "Network already exists"
+docker network inspect caddy_network >/dev/null 2>&1 || \
+    docker network create caddy_network
 echo -e "${GREEN}✓ Network ready${NC}"
 
-# Step 3: Stop and remove existing containers
-echo -e "${BLUE}Step 3: Stopping and removing existing containers...${NC}"
+# 3. 彻底清理 (包含清理无用镜像以释放空间)
+echo -e "${BLUE}Step 3: Cleaning up old containers and images...${NC}"
 docker compose down --remove-orphans
-docker rm -f animal_talk-app 2>/dev/null || true
-echo -e "${GREEN}✓ Containers cleaned up${NC}"
+docker image prune -f  # 自动清理 dangling images，保护 40GB 硬盘
+echo -e "${GREEN}✓ Cleanup completed${NC}"
 
-# Step 4: Remove old images (optional - uncomment to clean up old images)
-# echo -e "${BLUE}Step 4: Cleaning up old images...${NC}"
-# docker image prune -f
-# echo -e "${GREEN}✓ Old images removed${NC}"
-
-# Step 5: Build and start containers
+# 4. 构建并启动
 echo -e "${BLUE}Step 4: Building and starting containers...${NC}"
+# --build 确保 Dockerfile 里的 npm install -g npm@latest 被执行
 docker compose up -d --build --force-recreate
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✓ Containers started successfully${NC}"
+
+# 5. 等待健康检查 (针对新的 healthcheck 配置)
+echo -e "${BLUE}Step 5: Waiting for application to become healthy...${NC}"
+for i in {1..10}; do
+    STATUS=$(docker inspect --format='{{.State.Health.Status}}' animal_talk-app 2>/dev/null || echo "starting")
+    if [ "$STATUS" == "healthy" ]; then
+        echo -e "${GREEN}✓ Application is healthy!${NC}"
+        break
+    fi
+    echo -n "."
+    sleep 3
+done
+
+# 6. Caddy 重载
+echo -e "${BLUE}Step 6: Reloading Caddy configuration...${NC}"
+if docker ps | grep -q caddy; then
+    docker exec caddy caddy reload --config /etc/caddy/Caddyfile
+    echo -e "${GREEN}✓ Caddy reloaded${NC}"
 else
-    echo -e "${RED}✗ Failed to start containers${NC}"
-    exit 1
+    echo -e "${RED}⚠ Caddy container not found, skipping reload${NC}"
 fi
 
-# Step 6: Reload Caddy configuration
-echo -e "${BLUE}Step 5: Reloading Caddy configuration...${NC}"
-docker exec caddy caddy reload --config /etc/caddy/Caddyfile
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✓ Caddy configuration reloaded${NC}"
-else
-    echo -e "${RED}⚠ Warning: Failed to reload Caddy (you may need to restart it manually)${NC}"
-fi
-
-# Step 7: Show container status
-echo -e "${BLUE}Step 6: Container status:${NC}"
+# 7. 状态汇总
+echo -e "${BLUE}Step 7: Final status:${NC}"
 docker compose ps
-
-# Step 8: Show recent logs
-echo -e "${BLUE}Step 7: Recent logs (last 20 lines):${NC}"
-docker compose logs --tail=20
 
 echo ""
 echo "=========================================="
 echo -e "${GREEN}✓ Update completed successfully!${NC}"
 echo "=========================================="
-echo ""
-echo "Useful commands:"
-echo "  View logs:        docker compose logs -f"
-echo "  Restart:          docker compose restart"
-echo "  Stop:             docker compose down"
-echo "  View app status:  docker compose ps"
-echo ""
