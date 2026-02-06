@@ -1,0 +1,15 @@
+services:
+  animal_talk:
+    build: .
+    container_name: animal_talk-app
+    restart: unless-stopped
+    environment:
+      PORT: "5000"
+    expose:
+      - "5000"
+    networks:
+      - web
+
+networks:
+  web:
+    external: true
