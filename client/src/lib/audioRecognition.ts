@@ -1,3 +1,15 @@
+/**
+ * Audio recognition using feature-based analysis
+ * 
+ * This is the original recognition method that extracts audio features
+ * (spectral centroid, zero-crossing rate, RMS energy, activity ratio)
+ * and compares them against predefined profiles.
+ * 
+ * Note: Consider using audioRecognitionFast.ts for faster waveform-based recognition.
+ * 
+ * @module audioRecognition
+ */
+
 import type { SoundDefinition } from "@/lib/guineaPigSounds";
 
 export type RecognizerAnimal = "guinea_pig" | "cat" | "dog";
@@ -7,14 +19,20 @@ export type RecognitionOptions = {
   signal?: AbortSignal;
 };
 
+/**
+ * Audio features extracted from microphone input
+ */
 type AnalysisFeatures = {
-  centroidHz: number;
-  zcr: number;
-  rmsAvg: number;
-  rmsPeak: number;
-  activityRatio: number;
+  centroidHz: number;      // Spectral centroid - frequency center of gravity
+  zcr: number;             // Zero-crossing rate - frequency indicator
+  rmsAvg: number;          // Average RMS energy - volume level
+  rmsPeak: number;         // Peak RMS energy - maximum volume
+  activityRatio: number;   // Percentage of active frames above threshold
 };
 
+/**
+ * Sound profile with target values and tolerances
+ */
 type SoundProfile = {
   centroidHz: number;
   centroidTolerance: number;

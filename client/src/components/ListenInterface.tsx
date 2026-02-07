@@ -12,7 +12,7 @@ import {
 import { CAT_SOUND_LIBRARY, getRandomCatResult } from "@/lib/catSounds";
 import { DOG_SOUND_LIBRARY, getRandomDogResult } from "@/lib/dogSounds";
 import { recognizeAnimalSounds } from "@/lib/audioRecognition";
-import { recognizeAnimalSoundsFast } from "@/lib/audioRecognitionFast";
+import { recognizeAnimalSoundsFast, preloadReferenceWaveforms } from "@/lib/audioRecognitionFast";
 import guineaPigMascot from "@assets/generated_images/cute_guinea_pig_mascot_listening_with_headphones.png";
 import catMascot from "@assets/generated_images/cute_cat_mascot_with_headphones.png";
 import dogMascot from "@assets/generated_images/cute_dog_mascot_with_headphones.png";
@@ -122,6 +122,9 @@ export function ListenInterface({ language, animal }: ListenInterfaceProps) {
     setIsListening(false);
     setResults(null);
     setHistory([]);
+    
+    // Preload reference waveforms for faster first recognition
+    void preloadReferenceWaveforms(animal);
   }, [animal]);
 
   // Cleanup microphone analysis on unmount

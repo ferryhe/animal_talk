@@ -102,36 +102,52 @@ const REFERENCE_WAVEFORMS: Record<
 
 // Cache for loaded reference waveforms
 const referenceCache = new Map<string, Map<string, WaveformFeatures>>();
+// Track if reference loading is in progress to avoid duplicate loads
+const loadingPromises = new Map<string, Promise<Map<string, WaveformFeatures>>>();
 
 /**
- * Load reference waveforms for an animal
+ * Load reference waveforms for an animal (with deduplication)
+ * This ensures only one load operation happens even if called multiple times
  */
 async function loadReferenceWaveforms(
   animal: RecognizerAnimal
 ): Promise<Map<string, WaveformFeatures>> {
+  // Return cached if available
   if (referenceCache.has(animal)) {
     return referenceCache.get(animal)!;
   }
 
-  const refMap = new Map<string, WaveformFeatures>();
-  const soundMap = REFERENCE_WAVEFORMS[animal];
+  // Return existing promise if already loading
+  if (loadingPromises.has(animal)) {
+    return loadingPromises.get(animal)!;
+  }
 
-  // Load first URL for each sound as reference
-  const loadPromises = Object.entries(soundMap).map(async ([soundId, urls]) => {
-    if (urls.length > 0) {
-      try {
-        const features = await loadReferenceWaveform(soundId, urls[0]);
-        refMap.set(soundId, features);
-      } catch (error) {
-        console.warn(`Failed to load reference for ${soundId}:`, error);
+  // Start new load operation
+  const loadPromise = (async () => {
+    const refMap = new Map<string, WaveformFeatures>();
+    const soundMap = REFERENCE_WAVEFORMS[animal];
+
+    // Load first URL for each sound as reference
+    const loadPromises = Object.entries(soundMap).map(async ([soundId, urls]) => {
+      if (urls.length > 0) {
+        try {
+          const features = await loadReferenceWaveform(soundId, urls[0]);
+          refMap.set(soundId, features);
+        } catch (error) {
+          console.warn(`Failed to load reference for ${soundId}:`, error);
+        }
       }
-    }
-  });
+    });
 
-  await Promise.all(loadPromises);
-  referenceCache.set(animal, refMap);
+    await Promise.all(loadPromises);
+    referenceCache.set(animal, refMap);
+    loadingPromises.delete(animal); // Clean up after load completes
 
-  return refMap;
+    return refMap;
+  })();
+
+  loadingPromises.set(animal, loadPromise);
+  return loadPromise;
 }
 
 /**
@@ -284,4 +300,36 @@ export async function recognizeAnimalSoundsFast(
     // If waveform matching fails, throw to trigger fallback
     throw error;
   }
+}
+
+/**
+ * Pre-load reference waveforms for an animal to improve first-use performance
+ * Call this function early (e.g., when user selects an animal) to warm the cache
+ * 
+ * @param animal - The animal type to pre-load references for
+ * @returns Promise that resolves when references are loaded
+ * 
+ * @example
+ * // Pre-load when user navigates to listen mode
+ * useEffect(() => {
+ *   preloadReferenceWaveforms('guinea_pig');
+ * }, []);
+ */
+export async function preloadReferenceWaveforms(
+  animal: RecognizerAnimal
+): Promise<void> {
+  try {
+    await loadReferenceWaveforms(animal);
+  } catch (error) {
+    console.warn(`Failed to preload references for ${animal}:`, error);
+  }
+}
+
+/**
+ * Clear cached reference waveforms to free memory
+ * Useful for memory management in long-running sessions
+ */
+export function clearReferenceCache(): void {
+  referenceCache.clear();
+  loadingPromises.clear();
 }
