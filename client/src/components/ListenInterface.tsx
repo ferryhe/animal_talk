@@ -72,7 +72,7 @@ export function ListenInterface({ language, animal }: ListenInterfaceProps) {
       const newResults = await recognizeAnimalSoundsFast(
         animal,
         config.library,
-        { durationMs: duration, signal: controller.signal, useWaveformMatching: true },
+        { durationMs: duration, signal: controller.signal },
       );
       if (abortRef.current === controller && !controller.signal.aborted) {
         setResults(newResults);

@@ -8,6 +8,7 @@ import {
   extractFeaturesFromMicrophone,
   compareWaveforms,
   loadReferenceWaveform,
+  clearWaveformCache,
   type WaveformFeatures,
 } from "@/lib/waveformComparison";
 
@@ -16,7 +17,6 @@ export type RecognizerAnimal = "guinea_pig" | "cat" | "dog";
 export type RecognitionOptions = {
   durationMs: number;
   signal?: AbortSignal;
-  useWaveformMatching?: boolean; // Enable waveform comparison (default: true)
 };
 
 type RecognitionResult = {
@@ -106,8 +106,9 @@ const referenceCache = new Map<string, Map<string, WaveformFeatures>>();
 const loadingPromises = new Map<string, Promise<Map<string, WaveformFeatures>>>();
 
 /**
- * Load reference waveforms for an animal (with deduplication)
+ * Load reference waveforms for an animal (with deduplication and concurrency limiting)
  * This ensures only one load operation happens even if called multiple times
+ * and limits concurrent AudioContext usage to avoid browser limits
  */
 async function loadReferenceWaveforms(
   animal: RecognizerAnimal
@@ -122,13 +123,13 @@ async function loadReferenceWaveforms(
     return loadingPromises.get(animal)!;
   }
 
-  // Start new load operation
+  // Start new load operation with limited concurrency
   const loadPromise = (async () => {
     const refMap = new Map<string, WaveformFeatures>();
     const soundMap = REFERENCE_WAVEFORMS[animal];
 
-    // Load first URL for each sound as reference
-    const loadPromises = Object.entries(soundMap).map(async ([soundId, urls]) => {
+    // Load references sequentially to avoid hitting browser AudioContext limits
+    for (const [soundId, urls] of Object.entries(soundMap)) {
       if (urls.length > 0) {
         try {
           const features = await loadReferenceWaveform(soundId, urls[0]);
@@ -137,9 +138,8 @@ async function loadReferenceWaveforms(
           console.warn(`Failed to load reference for ${soundId}:`, error);
         }
       }
-    });
+    }
 
-    await Promise.all(loadPromises);
     referenceCache.set(animal, refMap);
     loadingPromises.delete(animal); // Clean up after load completes
 
@@ -163,7 +163,15 @@ async function analyzeMicrophoneWithWaveform(
   }
 
   const ctx = new AudioContext();
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  let stream: MediaStream;
+  
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    await ctx.close();
+    throw err;
+  }
+  
   const source = ctx.createMediaStreamSource(stream);
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 2048; // Higher resolution for waveform
@@ -172,8 +180,12 @@ async function analyzeMicrophoneWithWaveform(
 
   const bufferLength = analyser.fftSize;
   const dataArray = new Float32Array(bufferLength);
-  const collectedData: number[] = [];
   const sampleRate = ctx.sampleRate;
+  
+  // Pre-allocate array for efficiency (avoid push + spread overhead)
+  const expectedSamples = Math.ceil((durationMs / 30) * bufferLength);
+  const collectedData = new Float32Array(expectedSamples);
+  let writeIndex = 0;
 
   let intervalId: ReturnType<typeof setInterval> | null = null;
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -203,23 +215,33 @@ async function analyzeMicrophoneWithWaveform(
     // Collect audio data at 30ms intervals (faster than original 60ms)
     intervalId = setInterval(() => {
       analyser.getFloatTimeDomainData(dataArray);
-      collectedData.push(...Array.from(dataArray));
+      // Copy directly into pre-allocated array (avoid push + spread overhead)
+      for (let i = 0; i < dataArray.length && writeIndex < collectedData.length; i++) {
+        collectedData[writeIndex++] = dataArray[i];
+      }
     }, 30);
 
     timeoutId = setTimeout(() => {
       cleanup();
       signal?.removeEventListener("abort", onAbort);
 
-      if (collectedData.length === 0) {
+      if (writeIndex === 0) {
         reject(new Error("no audio data"));
         return;
       }
 
-      // Convert to Float32Array
-      const audioData = new Float32Array(collectedData);
+      // Trim to actual collected length
+      const audioData = collectedData.slice(0, writeIndex);
       
-      // Check if there's actual audio signal
-      const maxAmplitude = Math.max(...Array.from(audioData).map(Math.abs));
+      // Check if there's actual audio signal (compute max with loop, not spread)
+      let maxAmplitude = 0;
+      for (let i = 0; i < audioData.length; i++) {
+        const value = Math.abs(audioData[i]);
+        if (value > maxAmplitude) {
+          maxAmplitude = value;
+        }
+      }
+      
       if (maxAmplitude < 0.005) {
         reject(new Error("no audio"));
         return;
@@ -245,61 +267,52 @@ export async function recognizeAnimalSoundsFast(
   library: SoundDefinition[],
   options: RecognitionOptions,
 ): Promise<SoundDefinition[]> {
-  const useWaveform = options.useWaveformMatching ?? true;
+  // Analyze microphone and extract waveform features
+  const { features } = await analyzeMicrophoneWithWaveform(
+    animal,
+    options.durationMs,
+    options.signal,
+  );
 
-  try {
-    // Analyze microphone and extract waveform features
-    const { features } = await analyzeMicrophoneWithWaveform(
-      animal,
-      options.durationMs,
-      options.signal,
-    );
+  // Load reference waveforms
+  const referenceMap = await loadReferenceWaveforms(animal);
 
-    if (useWaveform) {
-      // Load reference waveforms
-      const referenceMap = await loadReferenceWaveforms(animal);
+  if (referenceMap.size > 0) {
+    // Compare against reference waveforms
+    const matches: RecognitionResult[] = [];
 
-      if (referenceMap.size > 0) {
-        // Compare against reference waveforms
-        const matches: RecognitionResult[] = [];
+    for (const [soundId, refFeatures] of referenceMap.entries()) {
+      const similarity = compareWaveforms(features, refFeatures);
+      const confidence = Math.round(
+        Math.min(95, Math.max(10, similarity * 100))
+      );
 
-        for (const [soundId, refFeatures] of referenceMap.entries()) {
-          const similarity = compareWaveforms(features, refFeatures);
-          const confidence = Math.round(
-            Math.min(95, Math.max(10, similarity * 100))
-          );
-
-          matches.push({
-            soundId,
-            confidence,
-            method: "waveform",
-          });
-        }
-
-        // Sort by confidence
-        matches.sort((a, b) => b.confidence - a.confidence);
-
-        // Map to SoundDefinition objects
-        const results = matches.slice(0, 3).map((match) => {
-          const sound = library.find((s) => s.id === match.soundId);
-          if (sound) {
-            return { ...sound, confidence: match.confidence };
-          }
-          return null;
-        }).filter((s): s is SoundDefinition => s !== null);
-
-        if (results.length > 0) {
-          return results;
-        }
-      }
+      matches.push({
+        soundId,
+        confidence,
+        method: "waveform",
+      });
     }
 
-    // Fallback: return random results if waveform matching fails
-    throw new Error("waveform matching failed");
-  } catch (error) {
-    // If waveform matching fails, throw to trigger fallback
-    throw error;
+    // Sort by confidence
+    matches.sort((a, b) => b.confidence - a.confidence);
+
+    // Map to SoundDefinition objects
+    const results = matches.slice(0, 3).map((match) => {
+      const sound = library.find((s) => s.id === match.soundId);
+      if (sound) {
+        return { ...sound, confidence: match.confidence };
+      }
+      return null;
+    }).filter((s): s is SoundDefinition => s !== null);
+
+    if (results.length > 0) {
+      return results;
+    }
   }
+
+  // If no results, throw to trigger fallback
+  throw new Error("waveform matching failed");
 }
 
 /**
@@ -332,4 +345,5 @@ export async function preloadReferenceWaveforms(
 export function clearReferenceCache(): void {
   referenceCache.clear();
   loadingPromises.clear();
+  clearWaveformCache(); // Also clear underlying waveform cache
 }

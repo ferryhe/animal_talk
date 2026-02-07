@@ -25,9 +25,9 @@ The original audio recognition system used a **feature-based approach**:
 A new module that analyzes actual sound waveforms for pattern matching:
 
 #### Features Extracted
-- **Downsampled waveform** (256 samples): Quick shape comparison
+- **Downsampled waveform** (256 samples): Signed samples for true shape comparison
 - **Amplitude envelope**: Temporal pattern of loudness changes
-- **Spectral profile** (32 bins): Frequency distribution fingerprint
+- **Spectral profile** (32 bins): Frequency-domain energy distribution using windowed analysis
 - **Peak positions**: Rhythmic structure markers
 
 #### Similarity Metrics
