@@ -76,7 +76,7 @@ function downsampleArray(data: Float32Array, targetLength: number): Float32Array
     let count = 0;
     
     for (let j = start; j < end && j < data.length; j++) {
-      sum += Math.abs(data[j] ?? 0);
+      sum += Math.abs(data[j]);
       count++;
     }
     
@@ -99,7 +99,7 @@ function calculateEnvelope(data: Float32Array, targetLength: number): Float32Arr
     let max = 0;
     
     for (let j = start; j < end && j < data.length; j++) {
-      max = Math.max(max, Math.abs(data[j] ?? 0));
+      max = Math.max(max, Math.abs(data[j]));
     }
     
     envelope[i] = max;
@@ -130,7 +130,7 @@ function calculateSpectralProfile(data: Float32Array, numBins: number): Float32A
       let binEnergy = 0;
       
       for (let i = freqStart; i < freqEnd && offset + i < data.length; i++) {
-        binEnergy += Math.abs(data[offset + i] ?? 0);
+        binEnergy += Math.abs(data[offset + i]);
       }
       
       profile[bin] += binEnergy;
@@ -157,9 +157,9 @@ function findPeaks(envelope: Float32Array, threshold: number): number[] {
   const thresholdVal = maxVal * threshold;
   
   for (let i = 1; i < envelope.length - 1; i++) {
-    const prev = envelope[i - 1] ?? 0;
-    const curr = envelope[i] ?? 0;
-    const next = envelope[i + 1] ?? 0;
+    const prev = envelope[i - 1];
+    const curr = envelope[i];
+    const next = envelope[i + 1];
     
     if (curr > prev && curr > next && curr > thresholdVal) {
       peaks.push(i / envelope.length);
@@ -179,8 +179,8 @@ function crossCorrelation(a: Float32Array, b: Float32Array): number {
   let normB = 0;
   
   for (let i = 0; i < len; i++) {
-    const valA = a[i] ?? 0;
-    const valB = b[i] ?? 0;
+    const valA = a[i];
+    const valB = b[i];
     correlation += valA * valB;
     normA += valA * valA;
     normB += valB * valB;
