@@ -12,6 +12,7 @@ import {
 import { CAT_SOUND_LIBRARY, getRandomCatResult } from "@/lib/catSounds";
 import { DOG_SOUND_LIBRARY, getRandomDogResult } from "@/lib/dogSounds";
 import { recognizeAnimalSounds } from "@/lib/audioRecognition";
+import { recognizeAnimalSoundsFast, preloadReferenceWaveforms } from "@/lib/audioRecognitionFast";
 import guineaPigMascot from "@assets/generated_images/cute_guinea_pig_mascot_listening_with_headphones.png";
 import catMascot from "@assets/generated_images/cute_cat_mascot_with_headphones.png";
 import dogMascot from "@assets/generated_images/cute_dog_mascot_with_headphones.png";
@@ -61,12 +62,14 @@ export function ListenInterface({ language, animal }: ListenInterfaceProps) {
     setResults(null);
     setIsListening(true);
     
-    const duration = Math.random() * 2000 + 2000;
+    // Reduced duration for faster feedback (1.5-2.5s instead of 2-4s)
+    const duration = Math.random() * 1000 + 1500;
     const controller = new AbortController();
     abortRef.current = controller;
 
     try {
-      const newResults = await recognizeAnimalSounds(
+      // Try fast waveform-based recognition first
+      const newResults = await recognizeAnimalSoundsFast(
         animal,
         config.library,
         { durationMs: duration, signal: controller.signal },
@@ -75,8 +78,21 @@ export function ListenInterface({ language, animal }: ListenInterfaceProps) {
         setResults(newResults);
       }
     } catch {
-      if (abortRef.current === controller && !controller.signal.aborted) {
-        setResults(config.getFallbackResults());
+      // Fallback to feature-based recognition if waveform matching fails
+      try {
+        const newResults = await recognizeAnimalSounds(
+          animal,
+          config.library,
+          { durationMs: duration, signal: controller.signal },
+        );
+        if (abortRef.current === controller && !controller.signal.aborted) {
+          setResults(newResults);
+        }
+      } catch {
+        // Ultimate fallback: use simulated results
+        if (abortRef.current === controller && !controller.signal.aborted) {
+          setResults(config.getFallbackResults());
+        }
       }
     } finally {
       if (abortRef.current === controller) {
@@ -106,6 +122,9 @@ export function ListenInterface({ language, animal }: ListenInterfaceProps) {
     setIsListening(false);
     setResults(null);
     setHistory([]);
+    
+    // Preload reference waveforms for faster first recognition
+    void preloadReferenceWaveforms(animal);
   }, [animal]);
 
   // Cleanup microphone analysis on unmount
