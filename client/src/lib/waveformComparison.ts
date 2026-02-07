@@ -129,49 +129,20 @@ function calculateEnvelope(data: Float32Array, targetLength: number): Float32Arr
 }
 
 /**
- * Calculate spectral profile using Web Audio API frequency data
- * This provides a true frequency-domain representation
+ * Calculate spectral profile using windowed energy analysis
+ * Bins audio energy across frequency-like bands using sliding windows
  */
 function calculateSpectralProfile(audioBuffer: AudioBuffer, numBins: number): Float32Array {
   const profile = new Float32Array(numBins);
-  
-  // Create an OfflineAudioContext for FFT analysis
-  const offlineCtx = new OfflineAudioContext(
-    1,
-    audioBuffer.length,
-    audioBuffer.sampleRate
-  );
-  
-  const source = offlineCtx.createBufferSource();
-  source.buffer = audioBuffer;
-  
-  const analyser = offlineCtx.createAnalyser();
-  analyser.fftSize = 2048;
-  analyser.smoothingTimeConstant = 0;
-  
-  source.connect(analyser);
-  analyser.connect(offlineCtx.destination);
-  
-  // Get frequency data
-  const frequencyData = new Uint8Array(analyser.frequencyBinCount);
-  
-  // Sample frequency data at multiple points
-  const numSamples = 10;
-  const sampleInterval = audioBuffer.duration / numSamples;
-  
-  source.start();
-  
-  // Note: Since we can't actually get real-time frequency data from OfflineAudioContext,
-  // we'll use a simpler approach that bins the frequency data
   const channelData = audioBuffer.getChannelData(0);
   
-  // Use sliding window FFT-like approach
+  // Use sliding window approach
   const windowSize = 2048;
   const hopSize = Math.floor(channelData.length / 20); // 20 analysis windows
   
   let windowCount = 0;
   for (let offset = 0; offset + windowSize < channelData.length; offset += hopSize) {
-    // Simple frequency binning based on energy in different frequency bands
+    // Bin energy across different frequency-like bands
     for (let bin = 0; bin < numBins; bin++) {
       const binStart = Math.floor((bin * windowSize) / numBins);
       const binEnd = Math.floor(((bin + 1) * windowSize) / numBins);
