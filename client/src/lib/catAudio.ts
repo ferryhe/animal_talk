@@ -43,7 +43,7 @@ const SAMPLE_PROFILES: Record<
   yowl: {
     urls: [catMeowOneUrl, catMeowTwoUrl],
     startRatio: [0.0, 0.5],
-    duration: [0.5, 1.0],
+    duration: [2.7, 1.2],
     playbackRate: [0.8, 1.0],
     gain: 0.2,
   },
@@ -203,7 +203,7 @@ function playHiss() {
 function playChirp() {
   const ctx = getAudioContext();
   
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 21; i++) {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     
