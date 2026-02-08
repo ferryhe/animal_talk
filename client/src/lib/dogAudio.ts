@@ -59,7 +59,7 @@ const SAMPLE_PROFILES: Record<
   happy_panting: {
     urls: [dogHappyPantingOneUrl, dogHappyPantingTwoUrl],
     startRatio: [0.0, 0.5],
-    duration: [2.0, 3.0],
+    duration: [3.4, 2.3],
     playbackRate: [0.95, 1.15],
     gain: 0.2,
   },
