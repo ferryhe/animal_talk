@@ -7,6 +7,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { generateAudioData } from "@/lib/audioGenerator";
 
 interface TranslationResultProps {
   results: SoundDefinition[];
@@ -14,9 +15,10 @@ interface TranslationResultProps {
   animal: 'guinea_pig' | 'cat' | 'dog';
   onConfirm: (sound: SoundDefinition | null) => void;
   onShare?: (sound: SoundDefinition) => void;
+  recordedAudio?: string | null; // Base64 encoded audio from microphone
 }
 
-export function TranslationResult({ results, language, animal, onConfirm, onShare }: TranslationResultProps) {
+export function TranslationResult({ results, language, animal, onConfirm, onShare, recordedAudio }: TranslationResultProps) {
   const [confirmedId, setConfirmedId] = useState<string | null>(null);
   const [sharingId, setSharingId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -24,21 +26,44 @@ export function TranslationResult({ results, language, animal, onConfirm, onShar
 
   const shareMutation = useMutation({
     mutationFn: async (sound: SoundDefinition) => {
+      // Use recorded audio if available, otherwise generate synthetic audio
+      let audioData = recordedAudio;
+      
+      if (!audioData) {
+        audioData = generateAudioData(
+          sound.id, // Use sound ID for synthetic audio fallback
+          1000 // 1 second audio
+        );
+      }
+      
+      const postData: any = {
+        animal,
+        soundType: language === 'en' ? sound.name : sound.name_zh,
+        interpretation: language === 'en' ? sound.translations.en : sound.translations.zh,
+        confidence: sound.confidence,
+        duration: recordedAudio ? 3000 : 1000, // Recorded audio is longer
+        metadata: {
+          context: sound.context,
+          allTranslations: sound.translations,
+          soundId: sound.id,
+          isRecordedAudio: !!recordedAudio,
+        },
+      };
+      
+      // Include audio data only if available
+      if (audioData) {
+        postData.audioData = audioData;
+      }
+      
       const response = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          animal,
-          soundType: language === 'en' ? sound.name : sound.name_zh,
-          interpretation: language === 'en' ? sound.translations.en : sound.translations.zh,
-          confidence: sound.confidence,
-          metadata: {
-            context: sound.context,
-            allTranslations: sound.translations,
-          },
-        }),
+        body: JSON.stringify(postData),
       });
-      if (!response.ok) throw new Error('Failed to share');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to share: ${errorText}`);
+      }
       return response.json();
     },
     onSuccess: () => {

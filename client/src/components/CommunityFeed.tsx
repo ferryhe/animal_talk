@@ -136,6 +136,18 @@ function PostCard({ post, language, onVote, onDelete, onPlay }: {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          {hasAudio && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPlay(post.audioData!)}
+              className="gap-2"
+              title={t.play}
+            >
+              <Volume2 className="w-4 h-4" />
+            </Button>
+          )}
+          
           <Button
             variant={post.userVote === 'up' ? "default" : "outline"}
             size="sm"
@@ -155,16 +167,6 @@ function PostCard({ post, language, onVote, onDelete, onPlay }: {
             <ThumbsDown className="w-4 h-4 mr-1" />
             {post.downvotes}
           </Button>
-
-          {hasAudio && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onPlay(post.audioData!)}
-            >
-              <Volume2 className="w-4 h-4" />
-            </Button>
-          )}
 
           <Button
             variant="ghost"
