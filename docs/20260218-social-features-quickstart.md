@@ -95,8 +95,8 @@ Fully supports English and Chinese:
 
 ### New Files:
 - `client/src/components/CommunityFeed.tsx` - Community feed component
-- `SOCIAL_FEATURES.md` - Detailed documentation
-- `SOCIAL_FEATURES_QUICKSTART.md` - This file
+- `docs/20260218-social-features.md` - Detailed documentation
+- `docs/20260218-social-features-quickstart.md` - This file
 
 ### Modified Files:
 - `shared/schema.ts` - Added posts and votes tables
@@ -120,7 +120,7 @@ Fully supports English and Chinese:
 5. Add rate limiting to prevent spam
 
 ### Want More Features?
-See [SOCIAL_FEATURES.md](./SOCIAL_FEATURES.md) for ideas:
+See [20260218-social-features.md](./20260218-social-features.md) for ideas:
 - Comments on posts
 - User profiles
 - Audio playback
