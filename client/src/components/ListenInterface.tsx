@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { AudioVisualizer } from "@/components/AudioVisualizer";
 import { TranslationResult } from "@/components/TranslationResult";
+import { useToast } from "@/hooks/use-toast";
 import {
   GUINEA_PIG_SOUND_LIBRARY,
   getRandomGuineaPigResult,
@@ -50,61 +51,24 @@ export function ListenInterface({ language, animal }: ListenInterfaceProps) {
   const [isListening, setIsListening] = useState(false);
   const [results, setResults] = useState<SoundDefinition[] | null>(null);
   const [history, setHistory] = useState<SoundDefinition[]>([]);
-  const abortRef = useRef<AbortController | null>(null);
+  const { toast } = useToast();
 
   const config = ANIMAL_CONFIG[animal];
   const mascotImage = config.mascot;
   const animalName = language === 'en' ? config.name_en : config.name_zh;
 
-  const startListening = async () => {
-    if (isListening) return;
-    
-    setResults(null);
-    setIsListening(true);
-    
-    // Reduced duration for faster feedback (1.5-2.5s instead of 2-4s)
-    const duration = Math.random() * 1000 + 1500;
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    try {
-      // Try fast waveform-based recognition first
-      const newResults = await recognizeAnimalSoundsFast(
-        animal,
-        config.library,
-        { durationMs: duration, signal: controller.signal },
-      );
-      if (abortRef.current === controller && !controller.signal.aborted) {
-        setResults(newResults);
-      }
-    } catch {
-      // Fallback to feature-based recognition if waveform matching fails
-      try {
-        const newResults = await recognizeAnimalSounds(
-          animal,
-          config.library,
-          { durationMs: duration, signal: controller.signal },
-        );
-        if (abortRef.current === controller && !controller.signal.aborted) {
-          setResults(newResults);
-        }
-      } catch {
-        // Ultimate fallback: use simulated results
-        if (abortRef.current === controller && !controller.signal.aborted) {
-          setResults(config.getFallbackResults());
-        }
-      }
-    } finally {
-      if (abortRef.current === controller) {
+  const handleMascotClick = () => {
+    if (isListening) {
+      setIsListening(false);
+    } else {
+      setIsListening(true);
+      setResults(null);
+      
+      setTimeout(() => {
+        setResults(config.getFallbackResults());
         setIsListening(false);
-      }
+      }, 2000);
     }
-  };
-
-  const stopListening = () => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setIsListening(false);
   };
 
   const handleConfirm = (sound: SoundDefinition | null) => {
@@ -117,27 +81,13 @@ export function ListenInterface({ language, animal }: ListenInterfaceProps) {
 
   // Clear results and history when animal changes
   useEffect(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
     setIsListening(false);
     setResults(null);
     setHistory([]);
-    
-    // Preload reference waveforms for faster first recognition
-    void preloadReferenceWaveforms(animal);
   }, [animal]);
-
-  // Cleanup microphone analysis on unmount
-  useEffect(() => {
-    return () => {
-      abortRef.current?.abort();
-      abortRef.current = null;
-    };
-  }, []);
 
   return (
     <div className="flex flex-col items-center justify-center w-full space-y-6 min-h-[60vh]">
-      
       {/* Mascot Area - Clickable Round Image */}
       <AnimatePresence mode="wait">
         {!results ? (
@@ -172,7 +122,7 @@ export function ListenInterface({ language, animal }: ListenInterfaceProps) {
 
             {/* Round Clickable Mascot */}
             <motion.button
-              onClick={isListening ? stopListening : startListening}
+              onClick={handleMascotClick}
               whileTap={{ scale: 0.92, y: 8 }}
               whileHover={{ scale: 1.02 }}
               className={`
@@ -185,7 +135,7 @@ export function ListenInterface({ language, animal }: ListenInterfaceProps) {
                 background: 'linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--background)) 100%)'
               }}
             >
-              <img 
+              <img
                 src={mascotImage} 
                 alt={animal === 'guinea_pig' ? "Cute Guinea Pig" : "Cute Cat"} 
                 className="w-full h-full object-cover"
@@ -260,6 +210,7 @@ export function ListenInterface({ language, animal }: ListenInterfaceProps) {
             <TranslationResult 
               results={results} 
               language={language}
+              animal={animal}
               onConfirm={handleConfirm}
             />
           </motion.div>
