@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Volume2, ChevronDown, Check } from "lucide-react";
+import { Volume2, ChevronDown, Check, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import useEmblaCarousel from "embla-carousel-react";
 import { ListenInterface } from "@/components/ListenInterface";
 import { SayInterface } from "@/components/SayInterface";
+import { CommunityFeed } from "@/components/CommunityFeed";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 type Animal = 'guinea_pig' | 'cat' | 'dog';
+type Tab = 'listen' | 'say' | 'community';
 
 const ANIMALS: { id: Animal; name: string; name_zh: string; emoji: string; appName: string }[] = [
   { id: 'guinea_pig', name: 'Guinea Pig', name_zh: '豚鼠', emoji: '🐹', appName: 'WheekTalk' },
@@ -90,14 +92,14 @@ function AnimalSwitcher({
 export default function Home() {
   const [language, setLanguage] = useState<'en' | 'zh'>('zh');
   const [animal, setAnimal] = useState<Animal>('guinea_pig');
-  const [activeTab, setActiveTab] = useState<'listen' | 'say'>('listen');
+  const [activeTab, setActiveTab] = useState<Tab>('listen');
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false });
 
   // Update active tab when carousel scrolls
   if (emblaApi) {
     emblaApi.on('select', () => {
       const index = emblaApi.selectedScrollSnap();
-      setActiveTab(index === 0 ? 'listen' : 'say');
+      setActiveTab(index === 0 ? 'listen' : index === 1 ? 'say' : 'community');
     });
   }
 
@@ -142,6 +144,18 @@ export default function Home() {
           >
             {language === 'en' ? "Say" : "说"}
           </button>
+          <button
+            onClick={() => scrollTo(2)}
+            className={cn(
+              "px-5 py-2 rounded-full text-sm font-bold transition-all duration-300 flex items-center gap-1.5",
+              activeTab === 'community' 
+                ? "bg-background text-primary shadow-sm" 
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Users className="w-4 h-4" />
+            {language === 'en' ? "Community" : "社区"}
+          </button>
         </div>
       </div>
 
@@ -153,6 +167,9 @@ export default function Home() {
             </div>
             <div className="flex-[0_0_100%] min-w-0 pl-4 pr-4 overflow-y-auto">
               <SayInterface language={language} animal={animal} />
+            </div>
+            <div className="flex-[0_0_100%] min-w-0 pl-4 pr-4 overflow-y-auto">
+              <CommunityFeed language={language} animal={animal} />
             </div>
           </div>
         </div>

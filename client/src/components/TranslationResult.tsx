@@ -1,19 +1,62 @@
 import { SoundDefinition } from "@/lib/guineaPigSounds";
-import { Check, ThumbsUp } from "lucide-react";
+import { Check, ThumbsUp, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 interface TranslationResultProps {
   results: SoundDefinition[];
   language: 'en' | 'zh';
+  animal: 'guinea_pig' | 'cat' | 'dog';
   onConfirm: (sound: SoundDefinition | null) => void;
+  onShare?: (sound: SoundDefinition) => void;
 }
 
-export function TranslationResult({ results, language, onConfirm }: TranslationResultProps) {
+export function TranslationResult({ results, language, animal, onConfirm, onShare }: TranslationResultProps) {
   const [confirmedId, setConfirmedId] = useState<string | null>(null);
+  const [sharingId, setSharingId] = useState<string | null>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const shareMutation = useMutation({
+    mutationFn: async (sound: SoundDefinition) => {
+      const response = await fetch('/api/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          animal,
+          soundType: language === 'en' ? sound.name : sound.name_zh,
+          interpretation: language === 'en' ? sound.translations.en : sound.translations.zh,
+          confidence: sound.confidence,
+          metadata: {
+            context: sound.context,
+            allTranslations: sound.translations,
+          },
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to share');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      toast({
+        title: language === 'en' ? "Shared to Community!" : "已分享到社区！",
+        description: language === 'en' ? "Your sound interpretation has been posted." : "您的声音解释已发布。",
+      });
+      setSharingId(null);
+    },
+    onError: () => {
+      toast({
+        title: language === 'en' ? "Failed to Share" : "分享失败",
+        variant: "destructive",
+      });
+      setSharingId(null);
+    },
+  });
 
   const handleConfirm = (sound: SoundDefinition) => {
     if (confirmedId === sound.id) {
@@ -22,6 +65,14 @@ export function TranslationResult({ results, language, onConfirm }: TranslationR
     } else {
       setConfirmedId(sound.id);
       onConfirm(sound);
+    }
+  };
+
+  const handleShare = (sound: SoundDefinition) => {
+    setSharingId(sound.id);
+    shareMutation.mutate(sound);
+    if (onShare) {
+      onShare(sound);
     }
   };
 
@@ -73,7 +124,18 @@ export function TranslationResult({ results, language, onConfirm }: TranslationR
               </div>
             </div>
 
-            <div className="mt-4 flex justify-end">
+            <div className="mt-4 flex justify-end gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="gap-2 hover:text-primary hover:border-primary/50"
+                onClick={() => handleShare(sound)}
+                disabled={sharingId === sound.id}
+              >
+                <Share2 className="w-4 h-4" />
+                {language === 'en' ? "Share" : "分享"}
+              </Button>
+              
               <Button 
                 variant={isConfirmed ? "default" : "outline"} 
                 size="sm"
@@ -91,7 +153,7 @@ export function TranslationResult({ results, language, onConfirm }: TranslationR
                 ) : (
                   <>
                     <ThumbsUp className="w-4 h-4" />
-                    {language === 'en' ? "Confirm Match" : "确认匹配"}
+                    {language === 'en' ? "Confirm" : "确认"}
                   </>
                 )}
               </Button>
