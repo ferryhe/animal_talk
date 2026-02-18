@@ -51,23 +51,71 @@ export function ListenInterface({ language, animal }: ListenInterfaceProps) {
   const [isListening, setIsListening] = useState(false);
   const [results, setResults] = useState<SoundDefinition[] | null>(null);
   const [history, setHistory] = useState<SoundDefinition[]>([]);
+  const [recordedAudio, setRecordedAudio] = useState<string | null>(null);
   const { toast } = useToast();
 
   const config = ANIMAL_CONFIG[animal];
   const mascotImage = config.mascot;
   const animalName = language === 'en' ? config.name_en : config.name_zh;
 
-  const handleMascotClick = () => {
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  const handleMascotClick = async () => {
     if (isListening) {
       setIsListening(false);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
     } else {
-      setIsListening(true);
-      setResults(null);
-      
-      setTimeout(() => {
-        setResults(config.getFallbackResults());
-        setIsListening(false);
-      }, 2000);
+      // Start recording
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+          audioChunksRef.current.push(event.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+          // Convert recorded audio to base64
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const reader = new FileReader();
+          reader.onloadend = async () => {
+            const base64Audio = (reader.result as string).split(',')[1];
+            setRecordedAudio(base64Audio);
+            
+            // Get recognition results
+            const recognitionResults = config.getFallbackResults();
+            setResults(recognitionResults);
+            setIsListening(false);
+          };
+          reader.readAsDataURL(audioBlob);
+
+          // Stop all tracks
+          stream.getTracks().forEach(track => track.stop());
+        };
+
+        setIsListening(true);
+        setResults(null);
+        mediaRecorder.start();
+
+        // Auto-stop after 3 seconds
+        setTimeout(() => {
+          if (mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+          }
+        }, 3000);
+      } catch (error) {
+        console.error('Error accessing microphone:', error);
+        toast({
+          title: language === 'en' ? 'Microphone Error' : '麦克风错误',
+          description: language === 'en' ? 'Could not access microphone' : '无法访问麦克风',
+          variant: 'destructive',
+        });
+      }
     }
   };
 
@@ -212,6 +260,7 @@ export function ListenInterface({ language, animal }: ListenInterfaceProps) {
               language={language}
               animal={animal}
               onConfirm={handleConfirm}
+              recordedAudio={recordedAudio}
             />
           </motion.div>
         )}
