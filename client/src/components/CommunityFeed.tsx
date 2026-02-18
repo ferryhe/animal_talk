@@ -195,7 +195,9 @@ export function CommunityFeed({ language, animal }: CommunityFeedProps) {
   const { data: posts, isLoading, error } = useQuery({
     queryKey: ['posts', animal],
     queryFn: async () => {
-      const response = await fetch(`/api/posts?animal=${animal}&limit=50`);
+      const response = await fetch(`/api/posts?animal=${animal}&limit=50`, {
+        credentials: 'include',
+      });
       if (!response.ok) throw new Error('Failed to fetch posts');
       return response.json() as Promise<PostWithVote[]>;
     },
@@ -208,12 +210,14 @@ export function CommunityFeed({ language, animal }: CommunityFeedProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ voteType }),
+        credentials: 'include',
       });
       if (!response.ok) throw new Error('Failed to vote');
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts', animal] });
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
     },
     onError: () => {
       toast({
@@ -227,6 +231,7 @@ export function CommunityFeed({ language, animal }: CommunityFeedProps) {
     mutationFn: async (postId: string) => {
       const response = await fetch(`/api/posts/${postId}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
       if (!response.ok) throw new Error('Failed to delete');
       return response.json();

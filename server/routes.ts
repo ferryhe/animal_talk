@@ -2,7 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
-import { insertPostSchema, insertVoteSchema } from "@shared/schema";
+import { insertPostSchema, insertVoteSchema, insertUserSchema } from "@shared/schema";
+import bcrypt from "bcryptjs";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -19,17 +20,150 @@ export async function registerRoutes(
     return req.cookies.anonymousId;
   };
 
+  // Auth Routes
+  app.post("/api/auth/signup", async (req, res) => {
+    try {
+      const { username, password, bio, avatar } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: "Username and password required" });
+      }
+      
+      // Check if user exists
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ error: "Username already taken" });
+      }
+      
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      // Create user
+      const user = await storage.createUser({
+        username,
+        password: hashedPassword,
+        bio: bio || undefined,
+        avatar: avatar || "🐹",
+      });
+      
+      // Set session cookie
+      res.cookie('userId', user.id, {
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        httpOnly: true,
+      });
+      
+      res.json({
+        id: user.id,
+        username: user.username,
+        avatar: user.avatar,
+      });
+    } catch (error) {
+      console.error("Signup error:", error);
+      res.status(500).json({ error: "Failed to create account" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: "Username and password required" });
+      }
+      
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid username or password" });
+      }
+      
+      // Verify password
+      const passwordMatch = await bcrypt.compare(password, user.password);
+      if (!passwordMatch) {
+        return res.status(401).json({ error: "Invalid username or password" });
+      }
+      
+      // Set session cookie
+      res.cookie('userId', user.id, {
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        httpOnly: true,
+      });
+      
+      res.json({
+        id: user.id,
+        username: user.username,
+        avatar: user.avatar,
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ error: "Login failed" });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    res.clearCookie('userId');
+    res.json({ success: true });
+  });
+
+  app.get("/api/auth/me", async (req, res) => {
+    try {
+      const userId = req.cookies?.userId;
+      if (!userId) {
+        return res.json(null);
+      }
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.json(null);
+      }
+      
+      res.json({
+        id: user.id,
+        username: user.username,
+        avatar: user.avatar,
+        bio: user.bio,
+        totalPosts: user.totalPosts,
+        totalVotesReceived: user.totalVotesReceived,
+        createdAt: user.createdAt,
+      });
+    } catch (error) {
+      res.json(null);
+    }
+  });
+
   // Create a new post
   app.post("/api/posts", async (req, res) => {
     try {
-      const userId = getAnonymousUserId(req);
+      // Use logged-in user ID if available, otherwise use anonymous ID
+      const loggedInUserId = req.cookies?.userId;
+      let userId: string;
+      let username: string;
+      
+      if (loggedInUserId) {
+        userId = loggedInUserId;
+        const user = await storage.getUser(loggedInUserId);
+        username = user?.username || "Unknown";
+      } else {
+        userId = getAnonymousUserId(req);
+        username = "Anonymous";
+      }
+      
       const data = insertPostSchema.parse({
         ...req.body,
         userId,
-        username: req.body.username || "Anonymous",
+        username,
       });
       
       const post = await storage.createPost(data);
+      
+      // Update user's total posts count if logged in
+      if (loggedInUserId) {
+        const user = await storage.getUser(loggedInUserId);
+        if (user) {
+          await storage.updateUserStats(loggedInUserId, {
+            totalPosts: user.totalPosts + 1,
+          });
+        }
+      }
       
       // Set cookie for future requests
       res.cookie('anonymousId', userId, { 
@@ -132,6 +266,15 @@ export async function registerRoutes(
       const updatedPost = await storage.getPost(postId);
       const userVote = await storage.getUserVote(postId, userId);
       
+      // Update post author's total votes received if they're logged in
+      const postAuthor = await storage.getUser(post.userId);
+      if (postAuthor) {
+        const netVotes = (updatedPost?.upvotes || 0) - (updatedPost?.downvotes || 0);
+        await storage.updateUserStats(post.userId, {
+          totalVotesReceived: Math.max(0, netVotes),
+        });
+      }
+      
       res.cookie('anonymousId', userId, { 
         maxAge: 365 * 24 * 60 * 60 * 1000,
         httpOnly: true 
@@ -144,6 +287,18 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error voting on post:", error);
       res.status(500).json({ error: "Failed to vote on post" });
+    }
+  });
+
+  // Get user's posts
+  app.get("/api/users/:userId/posts", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const posts = await storage.getPosts({ userId });
+      res.json(posts);
+    } catch (error) {
+      console.error("Error fetching user posts:", error);
+      res.status(500).json({ error: "Failed to fetch user posts" });
     }
   });
 

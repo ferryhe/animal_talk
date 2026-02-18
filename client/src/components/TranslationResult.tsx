@@ -1,12 +1,13 @@
 import { SoundDefinition } from "@/lib/guineaPigSounds";
-import { Check, ThumbsUp, Share2 } from "lucide-react";
+import { Check, ThumbsUp, Share2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import { generateAudioData } from "@/lib/audioGenerator";
 
 interface TranslationResultProps {
@@ -21,8 +22,22 @@ interface TranslationResultProps {
 export function TranslationResult({ results, language, animal, onConfirm, onShare, recordedAudio }: TranslationResultProps) {
   const [confirmedId, setConfirmedId] = useState<string | null>(null);
   const [sharingId, setSharingId] = useState<string | null>(null);
+  const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Check if user is authenticated
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: async () => {
+      const response = await fetch('/api/auth/me', {
+        credentials: 'include',
+      });
+      if (!response.ok) return null;
+      return response.json();
+    },
+    retry: false,
+  });
 
   const shareMutation = useMutation({
     mutationFn: async (sound: SoundDefinition) => {
@@ -59,6 +74,7 @@ export function TranslationResult({ results, language, animal, onConfirm, onShar
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(postData),
+        credentials: 'include',
       });
       if (!response.ok) {
         const errorText = await response.text();
@@ -68,6 +84,7 @@ export function TranslationResult({ results, language, animal, onConfirm, onShar
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       toast({
         title: language === 'en' ? "Shared to Community!" : "已分享到社区！",
         description: language === 'en' ? "Your sound interpretation has been posted." : "您的声音解释已发布。",
@@ -94,6 +111,16 @@ export function TranslationResult({ results, language, animal, onConfirm, onShar
   };
 
   const handleShare = (sound: SoundDefinition) => {
+    if (!currentUser) {
+      toast({
+        title: language === 'en' ? "Login Required" : "需要登录",
+        description: language === 'en' ? "You need to create an account to share to the community." : "您需要创建账户才能分享到社区。",
+        variant: "destructive",
+      });
+      navigate('/auth');
+      return;
+    }
+    
     setSharingId(sound.id);
     shareMutation.mutate(sound);
     if (onShare) {
@@ -153,11 +180,21 @@ export function TranslationResult({ results, language, animal, onConfirm, onShar
               <Button 
                 variant="outline" 
                 size="sm"
-                className="gap-2 hover:text-primary hover:border-primary/50"
+                className={cn(
+                  "gap-2",
+                  !currentUser 
+                    ? "opacity-50 cursor-not-allowed" 
+                    : "hover:text-primary hover:border-primary/50"
+                )}
                 onClick={() => handleShare(sound)}
-                disabled={sharingId === sound.id}
+                disabled={sharingId === sound.id || !currentUser}
+                title={!currentUser ? (language === 'en' ? "Login required to share" : "需要登录才能分享") : ""}
               >
-                <Share2 className="w-4 h-4" />
+                {!currentUser ? (
+                  <Lock className="w-4 h-4" />
+                ) : (
+                  <Share2 className="w-4 h-4" />
+                )}
                 {language === 'en' ? "Share" : "分享"}
               </Button>
               

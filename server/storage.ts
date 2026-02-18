@@ -8,6 +8,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserStats(userId: string, updates: { totalPosts?: number; totalVotesReceived?: number }): Promise<User | undefined>;
   
   // Post methods
   createPost(post: InsertPost): Promise<Post>;
@@ -48,8 +49,32 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
-    const user: User = { ...insertUser, id };
+    const user: User = {
+      id,
+      username: insertUser.username,
+      password: insertUser.password,
+      bio: insertUser.bio || null,
+      avatar: insertUser.avatar || "🐹",
+      totalPosts: 0,
+      totalVotesReceived: 0,
+      createdAt: new Date(),
+    };
     this.users.set(id, user);
+    return user;
+  }
+
+  async updateUserStats(userId: string, updates: { totalPosts?: number; totalVotesReceived?: number }): Promise<User | undefined> {
+    const user = this.users.get(userId);
+    if (!user) return undefined;
+
+    if (updates.totalPosts !== undefined) {
+      user.totalPosts = updates.totalPosts;
+    }
+    if (updates.totalVotesReceived !== undefined) {
+      user.totalVotesReceived = updates.totalVotesReceived;
+    }
+
+    this.users.set(userId, user);
     return user;
   }
 
