@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ThumbsUp, ThumbsDown, Trash2, Share2, Volume2, Clock, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -6,6 +6,13 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import type { PostWithVote } from "@shared/schema";
 import guineaPigMascot from "@assets/generated_images/cute_guinea_pig_mascot_listening_with_headphones.png";
@@ -16,6 +23,8 @@ interface CommunityFeedProps {
   language: 'en' | 'zh';
   animal: 'guinea_pig' | 'cat' | 'dog';
 }
+
+type SortOption = 'newest' | 'most_likes' | 'most_dislikes';
 
 const translations = {
   en: {
@@ -32,6 +41,10 @@ const translations = {
     hoursAgo: (hrs: number) => `${hrs}h ago`,
     daysAgo: (days: number) => `${days}d ago`,
     score: "Score",
+    sortBy: "Sort by",
+    newest: "Newest",
+    mostLikes: "Most Likes",
+    mostDislikes: "Most Dislikes",
     loading: "Loading community posts...",
     errorLoading: "Failed to load posts",
     errorVoting: "Failed to vote",
@@ -52,6 +65,10 @@ const translations = {
     hoursAgo: (hrs: number) => `${hrs}小时前`,
     daysAgo: (days: number) => `${days}天前`,
     score: "评分",
+    sortBy: "排序",
+    newest: "最新",
+    mostLikes: "最多赞",
+    mostDislikes: "最多踩",
     loading: "加载社区帖子中...",
     errorLoading: "加载失败",
     errorVoting: "投票失败",
@@ -195,6 +212,18 @@ export function CommunityFeed({ language, animal }: CommunityFeedProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const [sortBy, setSortBy] = useState<SortOption>('newest');
+
+  useEffect(() => {
+    const savedSort = localStorage.getItem('community-feed-sort');
+    if (savedSort === 'newest' || savedSort === 'most_likes' || savedSort === 'most_dislikes') {
+      setSortBy(savedSort);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('community-feed-sort', sortBy);
+  }, [sortBy]);
 
   useEffect(() => {
     setAudioContext(new (window.AudioContext || (window as any).webkitAudioContext)());
@@ -276,6 +305,33 @@ export function CommunityFeed({ language, animal }: CommunityFeedProps) {
     }
   };
 
+  const sortedPosts = useMemo(() => {
+    if (!posts) return [];
+
+    const sorted = [...posts];
+
+    switch (sortBy) {
+      case 'most_likes':
+        sorted.sort((a, b) => {
+          if (b.upvotes !== a.upvotes) return b.upvotes - a.upvotes;
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+        break;
+      case 'most_dislikes':
+        sorted.sort((a, b) => {
+          if (b.downvotes !== a.downvotes) return b.downvotes - a.downvotes;
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+        break;
+      case 'newest':
+      default:
+        sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        break;
+    }
+
+    return sorted;
+  }, [posts, sortBy]);
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -315,9 +371,24 @@ export function CommunityFeed({ language, animal }: CommunityFeedProps) {
         </div>
         <div className="text-center">
           <h2 className="text-2xl font-display font-bold">{t.title}</h2>
-          <Badge variant="outline" className="mt-2">
-            {animalEmojis[animal]} {posts?.length || 0} {language === 'en' ? 'posts' : '帖子'}
-          </Badge>
+          <div className="mt-2 flex flex-col sm:flex-row items-center justify-center gap-2">
+            <Badge variant="outline">
+              {animalEmojis[animal]} {posts?.length || 0} {language === 'en' ? 'posts' : '帖子'}
+            </Badge>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">{t.sortBy}</span>
+              <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
+                <SelectTrigger className="h-8 w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">{t.newest}</SelectItem>
+                  <SelectItem value="most_likes">{t.mostLikes}</SelectItem>
+                  <SelectItem value="most_dislikes">{t.mostDislikes}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -329,7 +400,7 @@ export function CommunityFeed({ language, animal }: CommunityFeedProps) {
         </Card>
       ) : (
         <div className="space-y-3">
-          {posts.map((post) => (
+          {sortedPosts.map((post) => (
             <PostCard
               key={post.id}
               post={post}
