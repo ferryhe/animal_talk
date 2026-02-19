@@ -57,6 +57,27 @@ export const votes = pgTable("votes", {
   userIdIdx: index("vote_user_id_idx").on(table.userId),
 }));
 
+export const reports = pgTable("reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  postId: varchar("post_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  reason: text("reason"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  postIdIdx: index("report_post_id_idx").on(table.postId),
+  userIdIdx: index("report_user_id_idx").on(table.userId),
+}));
+
+export const favorites = pgTable("favorites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  postId: varchar("post_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  postIdIdx: index("favorite_post_id_idx").on(table.postId),
+  userIdIdx: index("favorite_user_id_idx").on(table.userId),
+}));
+
 export const insertPostSchema = createInsertSchema(posts).omit({
   id: true,
   createdAt: true,
@@ -69,10 +90,24 @@ export const insertVoteSchema = createInsertSchema(votes).omit({
   createdAt: true,
 });
 
+export const insertReportSchema = createInsertSchema(reports).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertFavoriteSchema = createInsertSchema(favorites).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type InsertPost = z.infer<typeof insertPostSchema>;
 export type Post = typeof posts.$inferSelect;
 export type InsertVote = z.infer<typeof insertVoteSchema>;
 export type Vote = typeof votes.$inferSelect;
+export type InsertReport = z.infer<typeof insertReportSchema>;
+export type Report = typeof reports.$inferSelect;
+export type InsertFavorite = z.infer<typeof insertFavoriteSchema>;
+export type Favorite = typeof favorites.$inferSelect;
 
 // Metadata type for posts
 export type PostMetadata = {
@@ -95,5 +130,6 @@ export type PostMetadata = {
 // Extended Post type with user's vote status and typed metadata
 export type PostWithVote = Omit<Post, 'metadata'> & {
   userVote?: 'up' | 'down' | null;
+  isFavorited?: boolean;
   metadata?: PostMetadata;
 };

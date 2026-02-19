@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ThumbsUp, ThumbsDown, Trash2, Share2, Volume2, Clock, TrendingUp } from "lucide-react";
+import { ThumbsUp, ThumbsDown, Trash2, Volume2, Clock, TrendingUp, Flag, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,12 @@ const translations = {
     upvote: "Helpful",
     downvote: "Not Helpful",
     delete: "Delete",
+    report: "Report",
+    favorite: "Favorite",
+    unfavorite: "Unfavorite",
+    favorited: "Saved to favorites",
+    unfavorited: "Removed from favorites",
+    reported: "Post reported",
     play: "Play Sound",
     justNow: "Just now",
     minutesAgo: (min: number) => `${min}m ago`,
@@ -49,6 +55,8 @@ const translations = {
     errorLoading: "Failed to load posts",
     errorVoting: "Failed to vote",
     errorDeleting: "Failed to delete post",
+    errorReporting: "Failed to report post",
+    errorFavoriting: "Failed to update favorite",
     deleted: "Post deleted",
   },
   zh: {
@@ -59,6 +67,12 @@ const translations = {
     upvote: "有用",
     downvote: "无用",
     delete: "删除",
+    report: "举报",
+    favorite: "收藏",
+    unfavorite: "取消收藏",
+    favorited: "已收藏",
+    unfavorited: "已取消收藏",
+    reported: "已举报帖子",
     play: "播放声音",
     justNow: "刚刚",
     minutesAgo: (min: number) => `${min}分钟前`,
@@ -73,6 +87,8 @@ const translations = {
     errorLoading: "加载失败",
     errorVoting: "投票失败",
     errorDeleting: "删除失败",
+    errorReporting: "举报失败",
+    errorFavoriting: "收藏更新失败",
     deleted: "已删除帖子",
   }
 };
@@ -102,12 +118,14 @@ function formatTimeAgo(date: Date, t: typeof translations.en): string {
   return t.daysAgo(diffDays);
 }
 
-function PostCard({ post, language, onVote, onDelete, onPlay }: {
+function PostCard({ post, language, onVote, onDelete, onPlay, onReport, onFavorite }: {
   post: PostWithVote;
   language: 'en' | 'zh';
   onVote: (postId: string, voteType: 'up' | 'down') => void;
   onDelete: (postId: string) => void;
   onPlay: (audioData: string) => void;
+  onReport: (postId: string) => void;
+  onFavorite: (postId: string) => void;
 }) {
   const t = translations[language];
   const score = post.upvotes - post.downvotes;
@@ -194,6 +212,26 @@ function PostCard({ post, language, onVote, onDelete, onPlay }: {
           </Button>
 
           <Button
+            variant={post.isFavorited ? "default" : "ghost"}
+            size="sm"
+            onClick={() => onFavorite(post.id)}
+            className={post.isFavorited ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"}
+            title={post.isFavorited ? t.unfavorite : t.favorite}
+          >
+            <Heart className={`w-4 h-4 ${post.isFavorited ? "fill-current" : ""}`} />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onReport(post.id)}
+            className="text-muted-foreground hover:text-foreground"
+            title={t.report}
+          >
+            <Flag className="w-4 h-4" />
+          </Button>
+
+          <Button
             variant="ghost"
             size="sm"
             onClick={() => onDelete(post.id)}
@@ -212,14 +250,17 @@ export function CommunityFeed({ language, animal }: CommunityFeedProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
-  const [sortBy, setSortBy] = useState<SortOption>('newest');
-
-  useEffect(() => {
-    const savedSort = localStorage.getItem('community-feed-sort');
-    if (savedSort === 'newest' || savedSort === 'most_likes' || savedSort === 'most_dislikes') {
-      setSortBy(savedSort);
+  
+  // Initialize sortBy from localStorage, defaulting to 'newest'
+  const [sortBy, setSortBy] = useState<SortOption>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('community-feed-sort');
+      if (saved === 'newest' || saved === 'most_likes' || saved === 'most_dislikes') {
+        return saved;
+      }
     }
-  }, []);
+    return 'newest';
+  });
 
   useEffect(() => {
     localStorage.setItem('community-feed-sort', sortBy);
@@ -290,6 +331,54 @@ export function CommunityFeed({ language, animal }: CommunityFeedProps) {
     },
   });
 
+  const reportMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      const response = await fetch(`/api/posts/${postId}/report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'inappropriate' }),
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to report');
+      return response.json() as Promise<{ success: boolean; alreadyReported: boolean }>;
+    },
+    onSuccess: () => {
+      toast({
+        title: t.reported,
+      });
+    },
+    onError: () => {
+      toast({
+        title: t.errorReporting,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const favoriteMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      const response = await fetch(`/api/posts/${postId}/favorite`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to favorite');
+      return response.json() as Promise<{ success: boolean; favorited: boolean }>;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['posts', animal] });
+      queryClient.invalidateQueries({ queryKey: ['userFavorites'] });
+      toast({
+        title: data.favorited ? t.favorited : t.unfavorited,
+      });
+    },
+    onError: () => {
+      toast({
+        title: t.errorFavoriting,
+        variant: "destructive",
+      });
+    },
+  });
+
   const playAudio = async (base64Audio: string) => {
     if (!audioContext) return;
 
@@ -306,20 +395,20 @@ export function CommunityFeed({ language, animal }: CommunityFeedProps) {
   };
 
   const sortedPosts = useMemo(() => {
-    if (!posts) return [];
+    if (!posts || posts.length === 0) return [];
 
     const sorted = [...posts];
 
     switch (sortBy) {
       case 'most_likes':
         sorted.sort((a, b) => {
-          if (b.upvotes !== a.upvotes) return b.upvotes - a.upvotes;
+          if (a.upvotes !== b.upvotes) return b.upvotes - a.upvotes;
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
         break;
       case 'most_dislikes':
         sorted.sort((a, b) => {
-          if (b.downvotes !== a.downvotes) return b.downvotes - a.downvotes;
+          if (a.downvotes !== b.downvotes) return b.downvotes - a.downvotes;
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
         break;
@@ -377,9 +466,9 @@ export function CommunityFeed({ language, animal }: CommunityFeedProps) {
             </Badge>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">{t.sortBy}</span>
-              <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
+              <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
                 <SelectTrigger className="h-8 w-40">
-                  <SelectValue />
+                  <SelectValue placeholder={t.newest} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="newest">{t.newest}</SelectItem>
@@ -408,6 +497,8 @@ export function CommunityFeed({ language, animal }: CommunityFeedProps) {
               onVote={(postId, voteType) => voteMutation.mutate({ postId, voteType })}
               onDelete={(postId) => deleteMutation.mutate(postId)}
               onPlay={playAudio}
+              onReport={(postId) => reportMutation.mutate(postId)}
+              onFavorite={(postId) => favoriteMutation.mutate(postId)}
             />
           ))}
         </div>
