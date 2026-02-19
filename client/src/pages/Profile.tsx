@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { LogOut, Mail, Calendar, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 export function Profile() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   // Fetch current user
@@ -49,6 +50,7 @@ export function Profile() {
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       setCurrentUser(null);
       navigate('/');
       toast({

@@ -116,13 +116,34 @@ export async function registerRoutes(
         return res.json(null);
       }
       
+      // Recalculate stats from actual post data to ensure accuracy
+      const userPosts = await storage.getPosts({ userId, limit: 1000 });
+      const totalVotes = userPosts.reduce((sum, p) => {
+        return sum + (p.upvotes || 0) + (p.downvotes || 0);
+      }, 0);
+      
+      console.log(`[/api/auth/me] User ${user.username}:`, {
+        postsCount: userPosts.length,
+        totalVotes,
+        storedTotalPosts: user.totalPosts,
+        storedTotalVotesReceived: user.totalVotesReceived,
+      });
+      
+      // Update if stats don't match
+      if (user.totalPosts !== userPosts.length || user.totalVotesReceived !== totalVotes) {
+        await storage.updateUserStats(userId, {
+          totalPosts: userPosts.length,
+          totalVotesReceived: totalVotes,
+        });
+      }
+      
       res.json({
         id: user.id,
         username: user.username,
         avatar: user.avatar,
         bio: user.bio,
-        totalPosts: user.totalPosts,
-        totalVotesReceived: user.totalVotesReceived,
+        totalPosts: userPosts.length,
+        totalVotesReceived: totalVotes,
         createdAt: user.createdAt,
       });
     } catch (error) {
@@ -217,7 +238,10 @@ export async function registerRoutes(
   // Delete a post (only by creator)
   app.delete("/api/posts/:id", async (req, res) => {
     try {
-      const userId = getAnonymousUserId(req);
+      // Use logged-in user ID if available, otherwise use anonymous ID
+      const loggedInUserId = req.cookies?.userId;
+      const userId = loggedInUserId || getAnonymousUserId(req);
+      
       const post = await storage.getPost(req.params.id);
       
       if (!post) {
@@ -229,6 +253,24 @@ export async function registerRoutes(
       }
 
       await storage.deletePost(req.params.id);
+      
+      // Update user stats if they're logged in
+      if (loggedInUserId) {
+        const user = await storage.getUser(loggedInUserId);
+        if (user) {
+          // Recalculate total votes received across all remaining posts
+          const userPosts = await storage.getPosts({ userId: loggedInUserId, limit: 1000 });
+          const totalVotes = userPosts.reduce((sum, p) => {
+            return sum + (p.upvotes || 0) + (p.downvotes || 0);
+          }, 0);
+          
+          await storage.updateUserStats(loggedInUserId, {
+            totalPosts: userPosts.length,
+            totalVotesReceived: totalVotes,
+          });
+        }
+      }
+      
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting post:", error);
@@ -239,7 +281,9 @@ export async function registerRoutes(
   // Vote on a post
   app.post("/api/posts/:id/vote", async (req, res) => {
     try {
-      const userId = getAnonymousUserId(req);
+      // Use logged-in user ID if available, otherwise use anonymous ID
+      const loggedInUserId = req.cookies?.userId;
+      const userId = loggedInUserId || getAnonymousUserId(req);
       const postId = req.params.id;
       const voteType = req.body.voteType;
 
@@ -262,16 +306,26 @@ export async function registerRoutes(
         await storage.createVote({ postId, userId, voteType });
       }
 
-      // Get updated post
+      // Get updated post with fresh vote counts
       const updatedPost = await storage.getPost(postId);
       const userVote = await storage.getUserVote(postId, userId);
       
-      // Update post author's total votes received if they're logged in
+      // Update post author's total votes received across ALL their posts
       const postAuthor = await storage.getUser(post.userId);
       if (postAuthor) {
-        const netVotes = (updatedPost?.upvotes || 0) - (updatedPost?.downvotes || 0);
+        // Get all posts by this author with fresh data
+        const userPosts = await storage.getPosts({ userId: post.userId, limit: 1000 });
+        
+        // Sum up all votes (upvotes + downvotes) from all their posts
+        const totalVotes = userPosts.reduce((sum, p) => {
+          console.log(`  Post ${p.id.substring(0, 8)}: ${p.upvotes} upvotes + ${p.downvotes} downvotes`);
+          return sum + (p.upvotes || 0) + (p.downvotes || 0);
+        }, 0);
+        
+        console.log(`[Vote] User ${postAuthor.username} total votes: ${totalVotes}`);
+        
         await storage.updateUserStats(post.userId, {
-          totalVotesReceived: Math.max(0, netVotes),
+          totalVotesReceived: totalVotes,
         });
       }
       

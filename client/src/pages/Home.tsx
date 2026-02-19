@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Volume2, ChevronDown, Check, Users, User, LogOut } from "lucide-react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import useEmblaCarousel from "embla-carousel-react";
 import { ListenInterface } from "@/components/ListenInterface";
@@ -96,7 +96,8 @@ function AnimalSwitcher({
 export default function Home() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const [language, setLanguage] = useState<'en' | 'zh'>('zh');
+  const queryClient = useQueryClient();
+  const [language, setLanguage] = useState<'en' | 'zh'>('en');
   const [animal, setAnimal] = useState<Animal>('guinea_pig');
   const [activeTab, setActiveTab] = useState<Tab>('listen');
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false });
@@ -119,7 +120,7 @@ export default function Home() {
       method: 'POST',
       credentials: 'include',
     });
-    window.location.reload(); // Refresh page
+    queryClient.invalidateQueries({ queryKey: ['currentUser'] });
   };
 
   // Update active tab when carousel scrolls

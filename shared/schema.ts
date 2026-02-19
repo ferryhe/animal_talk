@@ -74,7 +74,26 @@ export type Post = typeof posts.$inferSelect;
 export type InsertVote = z.infer<typeof insertVoteSchema>;
 export type Vote = typeof votes.$inferSelect;
 
-// Extended Post type with user's vote status
-export type PostWithVote = Post & {
+// Metadata type for posts
+export type PostMetadata = {
+  context?: {
+    en?: string;
+    zh?: string;
+  };
+  allTranslations?: {
+    en?: string;
+    zh?: string;
+  };
+  soundName?: {
+    en?: string;
+    zh?: string;
+  };
+  soundId?: string;
+  isRecordedAudio?: boolean;
+};
+
+// Extended Post type with user's vote status and typed metadata
+export type PostWithVote = Omit<Post, 'metadata'> & {
   userVote?: 'up' | 'down' | null;
+  metadata?: PostMetadata;
 };

@@ -130,8 +130,16 @@ function PostCard({ post, language, onVote, onDelete, onPlay }: {
               </span>
             )}
           </div>
-          <p className="font-bold text-lg">{post.soundType}</p>
-          <p className="text-sm text-muted-foreground mt-1">{post.interpretation}</p>
+          <p className="font-bold text-lg">
+            {post.metadata?.soundName 
+              ? post.metadata.soundName[language]
+              : post.soundType}
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {post.metadata?.allTranslations
+              ? post.metadata.allTranslations[language]
+              : post.interpretation}
+          </p>
         </div>
 
         {/* Actions */}
@@ -218,6 +226,7 @@ export function CommunityFeed({ language, animal }: CommunityFeedProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts', animal] });
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+      queryClient.invalidateQueries({ queryKey: ['userPosts'] });
     },
     onError: () => {
       toast({
@@ -238,6 +247,8 @@ export function CommunityFeed({ language, animal }: CommunityFeedProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts', animal] });
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+      queryClient.invalidateQueries({ queryKey: ['userPosts'] });
       toast({
         title: t.deleted,
       });

@@ -60,6 +60,10 @@ export function TranslationResult({ results, language, animal, onConfirm, onShar
         metadata: {
           context: sound.context,
           allTranslations: sound.translations,
+          soundName: {
+            en: sound.name,
+            zh: sound.name_zh,
+          },
           soundId: sound.id,
           isRecordedAudio: !!recordedAudio,
         },

@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Post, type InsertPost, type Vote, type InsertVote, type PostWithVote } from "@shared/schema";
+import { type User, type InsertUser, type Post, type InsertPost, type Vote, type InsertVote, type PostWithVote, type PostMetadata } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 // modify the interface with any CRUD methods
@@ -176,6 +176,7 @@ export class MemStorage implements IStorage {
       const userVote = await this.getUserVote(post.id, userId);
       return {
         ...post,
+        metadata: post.metadata as PostMetadata | undefined,
         userVote: userVote?.voteType as 'up' | 'down' | undefined || null,
       };
     }));

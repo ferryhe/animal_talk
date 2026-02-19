@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export function Auth() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("login");
 
   // Login form
@@ -22,10 +23,14 @@ export function Auth() {
         body: JSON.stringify(data),
         credentials: "include",
       });
-      if (!response.ok) throw new Error("Login failed");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Login failed" }));
+        throw new Error(errorData.error || "Login failed");
+      }
       return response.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       toast({
         title: "Login successful",
         description: "Welcome back!",
@@ -56,10 +61,14 @@ export function Auth() {
         body: JSON.stringify(data),
         credentials: "include",
       });
-      if (!response.ok) throw new Error("Signup failed");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Signup failed" }));
+        throw new Error(errorData.error || "Signup failed");
+      }
       return response.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       toast({
         title: "Account created",
         description: "Welcome to Animal Talk!",
