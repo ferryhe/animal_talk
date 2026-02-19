@@ -7,11 +7,19 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  bio: text("bio"), // User bio/description
+  avatar: text("avatar"), // Avatar emoji or URL
+  totalPosts: integer("total_posts").notNull().default(0),
+  totalVotesReceived: integer("total_votes_received").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
+}).extend({
+  bio: z.string().optional(),
+  avatar: z.string().optional(),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -66,7 +74,26 @@ export type Post = typeof posts.$inferSelect;
 export type InsertVote = z.infer<typeof insertVoteSchema>;
 export type Vote = typeof votes.$inferSelect;
 
-// Extended Post type with user's vote status
-export type PostWithVote = Post & {
+// Metadata type for posts
+export type PostMetadata = {
+  context?: {
+    en?: string;
+    zh?: string;
+  };
+  allTranslations?: {
+    en?: string;
+    zh?: string;
+  };
+  soundName?: {
+    en?: string;
+    zh?: string;
+  };
+  soundId?: string;
+  isRecordedAudio?: boolean;
+};
+
+// Extended Post type with user's vote status and typed metadata
+export type PostWithVote = Omit<Post, 'metadata'> & {
   userVote?: 'up' | 'down' | null;
+  metadata?: PostMetadata;
 };

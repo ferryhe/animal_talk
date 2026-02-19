@@ -1,16 +1,20 @@
 import { useState } from "react";
-import { Volume2, ChevronDown, Check, Users } from "lucide-react";
+import { Volume2, ChevronDown, Check, Users, User, LogOut } from "lucide-react";
+import { useLocation } from "wouter";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import useEmblaCarousel from "embla-carousel-react";
 import { ListenInterface } from "@/components/ListenInterface";
 import { SayInterface } from "@/components/SayInterface";
 import { CommunityFeed } from "@/components/CommunityFeed";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
 
 type Animal = 'guinea_pig' | 'cat' | 'dog';
 type Tab = 'listen' | 'say' | 'community';
@@ -90,10 +94,34 @@ function AnimalSwitcher({
 }
 
 export default function Home() {
-  const [language, setLanguage] = useState<'en' | 'zh'>('zh');
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [language, setLanguage] = useState<'en' | 'zh'>('en');
   const [animal, setAnimal] = useState<Animal>('guinea_pig');
   const [activeTab, setActiveTab] = useState<Tab>('listen');
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false });
+
+  // Fetch current user
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: async () => {
+      const response = await fetch('/api/auth/me', {
+        credentials: 'include',
+      });
+      if (!response.ok) return null;
+      return response.json();
+    },
+    retry: false,
+  });
+
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { 
+      method: 'POST',
+      credentials: 'include',
+    });
+    queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+  };
 
   // Update active tab when carousel scrolls
   if (emblaApi) {
@@ -116,7 +144,33 @@ export default function Home() {
       {/* Header */}
       <header className="fixed top-0 left-0 w-full p-4 flex justify-between items-center z-50 bg-background/80 backdrop-blur-sm border-b border-border/50">
         <AnimalSwitcher current={animal} onChange={setAnimal} language={language} />
-        <LanguageSwitch current={language} onChange={setLanguage} />
+        <div className="flex items-center gap-4">
+          <LanguageSwitch current={language} onChange={setLanguage} />
+          {currentUser ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <span className="text-xl">{currentUser.avatar}</span>
+                  <span className="hidden sm:inline text-sm font-medium">{currentUser.username}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => navigate('/profile')}>
+                  <User className="w-4 h-4 mr-2" />
+                  Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button variant="default" size="sm" onClick={() => navigate('/auth')}>
+              {language === 'en' ? 'Login' : '登录'}
+            </Button>
+          )}
+        </div>
       </header>
 
       {/* Tab Navigation (Visual Indicator) */}

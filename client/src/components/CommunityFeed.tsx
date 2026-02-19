@@ -130,8 +130,16 @@ function PostCard({ post, language, onVote, onDelete, onPlay }: {
               </span>
             )}
           </div>
-          <p className="font-bold text-lg">{post.soundType}</p>
-          <p className="text-sm text-muted-foreground mt-1">{post.interpretation}</p>
+          <p className="font-bold text-lg">
+            {post.metadata?.soundName 
+              ? post.metadata.soundName[language]
+              : post.soundType}
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {post.metadata?.allTranslations
+              ? post.metadata.allTranslations[language]
+              : post.interpretation}
+          </p>
         </div>
 
         {/* Actions */}
@@ -195,7 +203,9 @@ export function CommunityFeed({ language, animal }: CommunityFeedProps) {
   const { data: posts, isLoading, error } = useQuery({
     queryKey: ['posts', animal],
     queryFn: async () => {
-      const response = await fetch(`/api/posts?animal=${animal}&limit=50`);
+      const response = await fetch(`/api/posts?animal=${animal}&limit=50`, {
+        credentials: 'include',
+      });
       if (!response.ok) throw new Error('Failed to fetch posts');
       return response.json() as Promise<PostWithVote[]>;
     },
@@ -208,12 +218,15 @@ export function CommunityFeed({ language, animal }: CommunityFeedProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ voteType }),
+        credentials: 'include',
       });
       if (!response.ok) throw new Error('Failed to vote');
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts', animal] });
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+      queryClient.invalidateQueries({ queryKey: ['userPosts'] });
     },
     onError: () => {
       toast({
@@ -227,12 +240,15 @@ export function CommunityFeed({ language, animal }: CommunityFeedProps) {
     mutationFn: async (postId: string) => {
       const response = await fetch(`/api/posts/${postId}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
       if (!response.ok) throw new Error('Failed to delete');
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts', animal] });
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+      queryClient.invalidateQueries({ queryKey: ['userPosts'] });
       toast({
         title: t.deleted,
       });
