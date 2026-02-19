@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
-import { insertPostSchema, insertVoteSchema, insertUserSchema } from "@shared/schema";
+import { insertPostSchema, insertVoteSchema, insertUserSchema, insertReportSchema, insertFavoriteSchema } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
 export async function registerRoutes(
@@ -148,6 +148,53 @@ export async function registerRoutes(
       });
     } catch (error) {
       res.json(null);
+    }
+  });
+
+  // Get public user profile by username
+  app.get("/api/users/:username/profile", async (req, res) => {
+    try {
+      const { username } = req.params;
+      const viewerId = getAnonymousUserId(req);
+
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Get user's posts
+      const posts = await storage.getPosts({ userId: user.id, limit: 1000 });
+
+      // Add vote data for each post
+      const postsWithVotes = await Promise.all(
+        posts.map(async (post) => {
+          const userVote = await storage.getUserVote(post.id, viewerId);
+          return {
+            ...post,
+            metadata: post.metadata,
+            userVote: userVote?.voteType as 'up' | 'down' | undefined || null,
+          };
+        })
+      );
+
+      // Calculate total votes
+      const totalVotes = postsWithVotes.reduce((sum, p) => {
+        return sum + (p.upvotes || 0) + (p.downvotes || 0);
+      }, 0);
+
+      res.json({
+        id: user.id,
+        username: user.username,
+        avatar: user.avatar,
+        bio: user.bio,
+        totalPosts: postsWithVotes.length,
+        totalVotesReceived: totalVotes,
+        createdAt: user.createdAt,
+        posts: postsWithVotes,
+      });
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+      res.status(500).json({ error: "Failed to fetch user profile" });
     }
   });
 
@@ -344,6 +391,84 @@ export async function registerRoutes(
     }
   });
 
+  // Report a post
+  app.post("/api/posts/:id/report", async (req, res) => {
+    try {
+      const loggedInUserId = req.cookies?.userId;
+      const userId = loggedInUserId || getAnonymousUserId(req);
+      const postId = req.params.id;
+
+      const post = await storage.getPost(postId);
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+
+      const existingReport = await storage.getUserReport(postId, userId);
+      if (existingReport) {
+        return res.json({ success: true, alreadyReported: true });
+      }
+
+      const payload = insertReportSchema.parse({
+        postId,
+        userId,
+        reason: typeof req.body?.reason === "string" ? req.body.reason : undefined,
+      });
+
+      await storage.createReport(payload);
+
+      res.cookie('anonymousId', userId, {
+        maxAge: 365 * 24 * 60 * 60 * 1000,
+        httpOnly: true
+      });
+
+      res.json({ success: true, alreadyReported: false });
+    } catch (error) {
+      console.error("Error reporting post:", error);
+      res.status(500).json({ error: "Failed to report post" });
+    }
+  });
+
+  // Favorite/unfavorite a post
+  app.post("/api/posts/:id/favorite", async (req, res) => {
+    try {
+      const loggedInUserId = req.cookies?.userId;
+      const userId = loggedInUserId || getAnonymousUserId(req);
+      const postId = req.params.id;
+
+      const post = await storage.getPost(postId);
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+
+      const existingFavorite = await storage.getUserFavorite(postId, userId);
+      if (existingFavorite) {
+        await storage.deleteFavorite(postId, userId);
+        res.cookie('anonymousId', userId, {
+          maxAge: 365 * 24 * 60 * 60 * 1000,
+          httpOnly: true,
+        });
+        return res.json({ success: true, favorited: false });
+      }
+
+      const payload = insertFavoriteSchema.parse({
+        postId,
+        userId,
+      });
+
+      await storage.createFavorite(payload);
+
+      res.cookie('anonymousId', userId, {
+        maxAge: 365 * 24 * 60 * 60 * 1000,
+        httpOnly: true,
+      });
+
+      res.json({ success: true, favorited: true });
+    } catch (error) {
+      console.error("Error favoriting post:", error);
+      res.status(500).json({ error: "Failed to favorite post" });
+    }
+  });
+
   // Get user's posts
   app.get("/api/users/:userId/posts", async (req, res) => {
     try {
@@ -353,6 +478,38 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching user posts:", error);
       res.status(500).json({ error: "Failed to fetch user posts" });
+    }
+  });
+
+  // Get user's favorited posts
+  app.get("/api/users/:userId/favorites", async (req, res) => {
+    try {
+      const viewerId = req.cookies?.userId || getAnonymousUserId(req);
+      const { userId } = req.params;
+
+      const posts = await storage.getUserFavorites(userId);
+      const postsWithMeta = await Promise.all(
+        posts.map(async (post) => {
+          const userVote = await storage.getUserVote(post.id, viewerId);
+          const userFavorite = await storage.getUserFavorite(post.id, viewerId);
+          return {
+            ...post,
+            metadata: post.metadata,
+            userVote: userVote?.voteType || null,
+            isFavorited: !!userFavorite,
+          };
+        })
+      );
+
+      res.cookie('anonymousId', viewerId, {
+        maxAge: 365 * 24 * 60 * 60 * 1000,
+        httpOnly: true,
+      });
+
+      res.json(postsWithMeta);
+    } catch (error) {
+      console.error("Error fetching user favorites:", error);
+      res.status(500).json({ error: "Failed to fetch favorites" });
     }
   });
 

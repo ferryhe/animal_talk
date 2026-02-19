@@ -1,18 +1,20 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { LogOut, Mail, Calendar, ArrowLeft } from "lucide-react";
+import { LogOut, Calendar, ArrowLeft, Volume2, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import type { PostWithVote } from "@shared/schema";
 
 export function Profile() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
 
   // Fetch current user
   const { data: user, isLoading } = useQuery({
@@ -41,11 +43,46 @@ export function Profile() {
     enabled: !!user?.id,
   });
 
+  const { data: favoritePosts = [] } = useQuery({
+    queryKey: ['userFavorites', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const response = await fetch(`/api/users/${user.id}/favorites`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch favorites');
+      return response.json() as Promise<PostWithVote[]>;
+    },
+    enabled: !!user?.id,
+  });
+
   useEffect(() => {
     if (user) {
       setCurrentUser(user);
     }
   }, [user]);
+
+  useEffect(() => {
+    setAudioContext(new (window.AudioContext || (window as any).webkitAudioContext)());
+  }, []);
+
+  const playAudio = async (base64Audio: string) => {
+    if (!audioContext) return;
+
+    try {
+      const audioData = Uint8Array.from(atob(base64Audio), c => c.charCodeAt(0));
+      const audioBuffer = await audioContext.decodeAudioData(audioData.buffer);
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContext.destination);
+      source.start(0);
+    } catch (error) {
+      toast({
+        title: "Failed to play audio",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -156,6 +193,52 @@ export function Profile() {
                 <CardContent className="py-4">
                   <p className="text-sm text-gray-500">{post.animal}</p>
                   <p className="font-semibold">{post.soundType}</p>
+                  <p className="text-sm">{post.interpretation}</p>
+                  <div className="flex gap-4 mt-2">
+                    <Badge variant="secondary">👍 {post.upvotes}</Badge>
+                    <Badge variant="secondary">👎 {post.downvotes}</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Favorites */}
+      <div>
+        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+          <Heart className="w-6 h-6" />
+          Your Favorites ({favoritePosts.length})
+        </h2>
+        {favoritePosts.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-gray-500">
+              You haven't favorited any posts yet.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {favoritePosts.map((post: PostWithVote) => (
+              <Card key={post.id}>
+                <CardContent className="py-4">
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <div>
+                      <p className="text-sm text-gray-500">{post.animal} · {post.username}</p>
+                      <p className="font-semibold">{post.soundType}</p>
+                    </div>
+                    {post.audioData && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => playAudio(post.audioData!)}
+                        className="gap-2"
+                      >
+                        <Volume2 className="w-4 h-4" />
+                        Listen
+                      </Button>
+                    )}
+                  </div>
                   <p className="text-sm">{post.interpretation}</p>
                   <div className="flex gap-4 mt-2">
                     <Badge variant="secondary">👍 {post.upvotes}</Badge>

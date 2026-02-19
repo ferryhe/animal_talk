@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Post, type InsertPost, type Vote, type InsertVote, type PostWithVote, type PostMetadata } from "@shared/schema";
+import { type User, type InsertUser, type Post, type InsertPost, type Vote, type InsertVote, type Report, type InsertReport, type Favorite, type InsertFavorite, type PostWithVote, type PostMetadata } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 // modify the interface with any CRUD methods
@@ -21,6 +21,16 @@ export interface IStorage {
   deleteVote(postId: string, userId: string): Promise<boolean>;
   getUserVote(postId: string, userId: string): Promise<Vote | undefined>;
   updatePostVoteCount(postId: string): Promise<void>;
+
+  // Report methods
+  createReport(report: InsertReport): Promise<Report>;
+  getUserReport(postId: string, userId: string): Promise<Report | undefined>;
+
+  // Favorite methods
+  createFavorite(favorite: InsertFavorite): Promise<Favorite>;
+  deleteFavorite(postId: string, userId: string): Promise<boolean>;
+  getUserFavorite(postId: string, userId: string): Promise<Favorite | undefined>;
+  getUserFavorites(userId: string): Promise<Post[]>;
   
   // Combined methods
   getPostsWithVotes(userId: string, filters?: { animal?: string; limit?: number; offset?: number }): Promise<PostWithVote[]>;
@@ -30,11 +40,15 @@ export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private posts: Map<string, Post>;
   private votes: Map<string, Vote>;
+  private reports: Map<string, Report>;
+  private favorites: Map<string, Favorite>;
 
   constructor() {
     this.users = new Map();
     this.posts = new Map();
     this.votes = new Map();
+    this.reports = new Map();
+    this.favorites = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -118,6 +132,15 @@ export class MemStorage implements IStorage {
   }
 
   async deletePost(id: string): Promise<boolean> {
+    Array.from(this.votes.entries()).forEach(([voteId, vote]) => {
+      if (vote.postId === id) this.votes.delete(voteId);
+    });
+    Array.from(this.reports.entries()).forEach(([reportId, report]) => {
+      if (report.postId === id) this.reports.delete(reportId);
+    });
+    Array.from(this.favorites.entries()).forEach(([favoriteId, favorite]) => {
+      if (favorite.postId === id) this.favorites.delete(favoriteId);
+    });
     return this.posts.delete(id);
   }
 
@@ -169,15 +192,84 @@ export class MemStorage implements IStorage {
     this.posts.set(postId, post);
   }
 
-  async getPostsWithVotes(userId: string, filters?: { animal?: string; limit?: number; offset?: number }): Promise<PostWithVote[]> {
+  async createReport(insertReport: InsertReport): Promise<Report> {
+    const existingReport = await this.getUserReport(insertReport.postId, insertReport.userId);
+    if (existingReport) return existingReport;
+
+    const id = randomUUID();
+    const report: Report = {
+      ...insertReport,
+      reason: insertReport.reason ?? null,
+      id,
+      createdAt: new Date(),
+    };
+
+    this.reports.set(id, report);
+    return report;
+  }
+
+  async getUserReport(postId: string, userId: string): Promise<Report | undefined> {
+    return Array.from(this.reports.values()).find(
+      (report) => report.postId === postId && report.userId === userId
+    );
+  }
+
+  async createFavorite(insertFavorite: InsertFavorite): Promise<Favorite> {
+    const existingFavorite = await this.getUserFavorite(insertFavorite.postId, insertFavorite.userId);
+    if (existingFavorite) return existingFavorite;
+
+    const id = randomUUID();
+    const favorite: Favorite = {
+      ...insertFavorite,
+      id,
+      createdAt: new Date(),
+    };
+
+    this.favorites.set(id, favorite);
+    return favorite;
+  }
+
+  async deleteFavorite(postId: string, userId: string): Promise<boolean> {
+    const existingFavorite = Array.from(this.favorites.entries()).find(
+      ([_, favorite]) => favorite.postId === postId && favorite.userId === userId
+    );
+
+    if (existingFavorite) {
+      this.favorites.delete(existingFavorite[0]);
+      return true;
+    }
+
+    return false;
+  }
+
+  async getUserFavorite(postId: string, userId: string): Promise<Favorite | undefined> {
+    return Array.from(this.favorites.values()).find(
+      (favorite) => favorite.postId === postId && favorite.userId === userId
+    );
+  }
+
+  async getUserFavorites(userId: string): Promise<Post[]> {
+    const favoritePostIds = Array.from(this.favorites.values())
+      .filter((favorite) => favorite.userId === userId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map((favorite) => favorite.postId);
+
+    return favoritePostIds
+      .map((postId) => this.posts.get(postId))
+      .filter((post): post is Post => !!post);
+  }
+
+  async getPostsWithVotes(userId: string, filters?: { animal?: string; userId?: string; limit?: number; offset?: number }): Promise<PostWithVote[]> {
     const posts = await this.getPosts(filters);
     
     return Promise.all(posts.map(async (post) => {
       const userVote = await this.getUserVote(post.id, userId);
+      const userFavorite = await this.getUserFavorite(post.id, userId);
       return {
         ...post,
         metadata: post.metadata as PostMetadata | undefined,
         userVote: userVote?.voteType as 'up' | 'down' | undefined || null,
+        isFavorited: !!userFavorite,
       };
     }));
   }
