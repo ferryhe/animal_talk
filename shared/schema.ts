@@ -78,6 +78,44 @@ export const favorites = pgTable("favorites", {
   userIdIdx: index("favorite_user_id_idx").on(table.userId),
 }));
 
+export const comments = pgTable("comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  postId: varchar("post_id").notNull(),
+  userId: varchar("user_id"),
+  anonymousId: varchar("anonymous_id"),
+  username: text("username").notNull(),
+  text: text("text").notNull(),
+  upvotes: integer("upvotes").notNull().default(0),
+  downvotes: integer("downvotes").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  postIdIdx: index("comment_post_id_idx").on(table.postId),
+  userIdIdx: index("comment_user_id_idx").on(table.userId),
+  createdAtIdx: index("comment_created_at_idx").on(table.createdAt),
+}));
+
+export const commentVotes = pgTable("comment_votes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  commentId: varchar("comment_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  voteType: text("vote_type").notNull(), // 'up' or 'down'
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  commentIdIdx: index("comment_vote_comment_id_idx").on(table.commentId),
+  userIdIdx: index("comment_vote_user_id_idx").on(table.userId),
+}));
+
+export const commentReports = pgTable("comment_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  commentId: varchar("comment_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  reason: text("reason"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  commentIdIdx: index("comment_report_comment_id_idx").on(table.commentId),
+  userIdIdx: index("comment_report_user_id_idx").on(table.userId),
+}));
+
 export const insertPostSchema = createInsertSchema(posts).omit({
   id: true,
   createdAt: true,
@@ -100,6 +138,23 @@ export const insertFavoriteSchema = createInsertSchema(favorites).omit({
   createdAt: true,
 });
 
+export const insertCommentSchema = createInsertSchema(comments).omit({
+  id: true,
+  createdAt: true,
+  upvotes: true,
+  downvotes: true,
+});
+
+export const insertCommentVoteSchema = createInsertSchema(commentVotes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCommentReportSchema = createInsertSchema(commentReports).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type InsertPost = z.infer<typeof insertPostSchema>;
 export type Post = typeof posts.$inferSelect;
 export type InsertVote = z.infer<typeof insertVoteSchema>;
@@ -108,6 +163,12 @@ export type InsertReport = z.infer<typeof insertReportSchema>;
 export type Report = typeof reports.$inferSelect;
 export type InsertFavorite = z.infer<typeof insertFavoriteSchema>;
 export type Favorite = typeof favorites.$inferSelect;
+export type InsertComment = z.infer<typeof insertCommentSchema>;
+export type Comment = typeof comments.$inferSelect;
+export type InsertCommentVote = z.infer<typeof insertCommentVoteSchema>;
+export type CommentVote = typeof commentVotes.$inferSelect;
+export type InsertCommentReport = z.infer<typeof insertCommentReportSchema>;
+export type CommentReport = typeof commentReports.$inferSelect;
 
 // Metadata type for posts
 export type PostMetadata = {
@@ -131,5 +192,11 @@ export type PostMetadata = {
 export type PostWithVote = Omit<Post, 'metadata'> & {
   userVote?: 'up' | 'down' | null;
   isFavorited?: boolean;
+  commentCount?: number;
   metadata?: PostMetadata;
+};
+
+// Extended Comment type with user's vote status
+export type CommentWithVote = Comment & {
+  userVote?: 'up' | 'down' | null;
 };

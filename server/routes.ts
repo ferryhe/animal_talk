@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
-import { insertPostSchema, insertVoteSchema, insertUserSchema, insertReportSchema, insertFavoriteSchema } from "@shared/schema";
+import { insertPostSchema, insertVoteSchema, insertUserSchema, insertReportSchema, insertFavoriteSchema, insertCommentSchema, insertCommentVoteSchema, insertCommentReportSchema } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
 export async function registerRoutes(
@@ -510,6 +510,214 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching user favorites:", error);
       res.status(500).json({ error: "Failed to fetch favorites" });
+    }
+  });
+
+  // Create a comment on a post
+  app.post("/api/posts/:id/comments", async (req, res) => {
+    try {
+      const loggedInUserId = req.cookies?.userId;
+      let userId: string | undefined;
+      let anonymousId: string | undefined;
+      let username: string;
+
+      if (loggedInUserId) {
+        userId = loggedInUserId;
+        const user = await storage.getUser(loggedInUserId);
+        username = user?.username || "Unknown";
+      } else {
+        anonymousId = getAnonymousUserId(req);
+        username = "Anonymous";
+      }
+
+      const postId = req.params.id;
+      const post = await storage.getPost(postId);
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+
+      const payload = insertCommentSchema.parse({
+        postId,
+        userId,
+        anonymousId,
+        username,
+        text: req.body.text,
+      });
+
+      const comment = await storage.createComment(payload);
+
+      if (anonymousId) {
+        res.cookie('anonymousId', anonymousId, {
+          maxAge: 365 * 24 * 60 * 60 * 1000,
+          httpOnly: true,
+        });
+      }
+
+      res.json(comment);
+    } catch (error) {
+      console.error("Error creating comment:", error);
+      res.status(400).json({ error: "Failed to create comment" });
+    }
+  });
+
+  // Get all comments for a post
+  app.get("/api/posts/:id/comments", async (req, res) => {
+    try {
+      const postId = req.params.id;
+      const post = await storage.getPost(postId);
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+
+      const loggedInUserId = req.cookies?.userId;
+      const anonymousId = getAnonymousUserId(req);
+      const userId = loggedInUserId || anonymousId;
+
+      const comments = await storage.getCommentsWithVotes(postId, userId);
+      res.json(comments);
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+      res.status(500).json({ error: "Failed to fetch comments" });
+    }
+  });
+
+  // Delete a comment (only by creator)
+  app.delete("/api/comments/:id", async (req, res) => {
+    try {
+      const loggedInUserId = req.cookies?.userId;
+      const anonymousId = getAnonymousUserId(req);
+      const commentId = req.params.id;
+
+      // Get the comment to check ownership
+      const comment = await storage.getComment(commentId);
+
+      if (!comment) {
+        return res.status(404).json({ error: "Comment not found" });
+      }
+
+      console.log("[Delete Comment] Check ownership:", {
+        loggedInUserId,
+        anonymousId,
+        commentUserId: comment.userId,
+        commentAnonymousId: comment.anonymousId,
+      });
+
+      // Check if user is the creator
+      // Match if: logged in and userId matches, OR anonymous and anonymousId matches
+      const isOwner = (loggedInUserId && comment.userId && comment.userId === loggedInUserId) ||
+                      (anonymousId && comment.anonymousId && comment.anonymousId === anonymousId);
+
+      if (!isOwner) {
+        console.log("[Delete Comment] Not authorized - ownership check failed");
+        return res.status(403).json({ error: "Not authorized to delete this comment" });
+      }
+
+      await storage.deleteComment(commentId);
+
+      res.cookie('anonymousId', anonymousId, {
+        maxAge: 365 * 24 * 60 * 60 * 1000,
+        httpOnly: true,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting comment:", error);
+      res.status(500).json({ error: "Failed to delete comment" });
+    }
+  });
+
+  // Vote on a comment
+  app.post("/api/comments/:id/vote", async (req, res) => {
+    try {
+      const loggedInUserId = req.cookies?.userId;
+      const anonymousId = getAnonymousUserId(req);
+      const userId = loggedInUserId || anonymousId;
+      const commentId = req.params.id;
+
+      // Verify comment exists
+      const comment = await storage.getComment(commentId);
+      if (!comment) {
+        return res.status(404).json({ error: "Comment not found" });
+      }
+
+      const { voteType } = req.body;
+      if (!voteType || !['up', 'down'].includes(voteType)) {
+        return res.status(400).json({ error: "Invalid vote type" });
+      }
+
+      // Check if user already voted on this comment
+      const existingVote = await storage.getUserCommentVote(commentId, userId);
+
+      if (existingVote) {
+        if (existingVote.voteType === voteType) {
+          // Unvote (remove the vote)
+          await storage.deleteCommentVote(commentId, userId);
+        } else {
+          // Change vote
+          await storage.createCommentVote({ commentId, userId, voteType });
+        }
+      } else {
+        // New vote
+        await storage.createCommentVote({ commentId, userId, voteType });
+      }
+
+      // Set anonymous cookie if needed
+      if (!loggedInUserId) {
+        res.cookie('anonymousId', anonymousId, {
+          maxAge: 365 * 24 * 60 * 60 * 1000,
+          httpOnly: true,
+        });
+      }
+
+      // Get updated comment
+      const updatedComment = await storage.getComment(commentId);
+      res.json(updatedComment);
+    } catch (error) {
+      console.error("Error voting on comment:", error);
+      res.status(500).json({ error: "Failed to vote on comment" });
+    }
+  });
+
+  // Report a comment
+  app.post("/api/comments/:id/report", async (req, res) => {
+    try {
+      const loggedInUserId = req.cookies?.userId;
+      const anonymousId = getAnonymousUserId(req);
+      const userId = loggedInUserId || anonymousId;
+      const commentId = req.params.id;
+
+      // Verify comment exists
+      const comment = await storage.getComment(commentId);
+      if (!comment) {
+        return res.status(404).json({ error: "Comment not found" });
+      }
+
+      // Check if user already reported this comment
+      const existingReport = await storage.getUserCommentReport(commentId, userId);
+      if (existingReport) {
+        return res.json({ success: true, message: "Already reported" });
+      }
+
+      const payload = insertCommentReportSchema.parse({
+        commentId,
+        userId,
+        reason: req.body.reason || null,
+      });
+
+      await storage.createCommentReport(payload);
+
+      // Set anonymous cookie if needed
+      if (!loggedInUserId) {
+        res.cookie('anonymousId', anonymousId, {
+          maxAge: 365 * 24 * 60 * 60 * 1000,
+          httpOnly: true,
+        });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error reporting comment:", error);
+      res.status(500).json({ error: "Failed to report comment" });
     }
   });
 
