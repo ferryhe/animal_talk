@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Post, type InsertPost, type Vote, type InsertVote, type Report, type InsertReport, type Favorite, type InsertFavorite, type PostWithVote, type PostMetadata } from "@shared/schema";
+import { type User, type InsertUser, type Post, type InsertPost, type Vote, type InsertVote, type Report, type InsertReport, type Favorite, type InsertFavorite, type Comment, type InsertComment, type CommentVote, type InsertCommentVote, type CommentReport, type InsertCommentReport, type PostWithVote, type CommentWithVote, type PostMetadata } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 // modify the interface with any CRUD methods
@@ -32,6 +32,23 @@ export interface IStorage {
   getUserFavorite(postId: string, userId: string): Promise<Favorite | undefined>;
   getUserFavorites(userId: string): Promise<Post[]>;
   
+  // Comment methods
+  createComment(comment: InsertComment): Promise<Comment>;
+  getComment(id: string): Promise<Comment | undefined>;
+  getCommentsByPostId(postId: string): Promise<Comment[]>;
+  getCommentsWithVotes(postId: string, userId: string): Promise<CommentWithVote[]>;
+  deleteComment(id: string): Promise<boolean>;
+  
+  // Comment vote methods
+  createCommentVote(vote: InsertCommentVote): Promise<CommentVote>;
+  deleteCommentVote(commentId: string, userId: string): Promise<boolean>;
+  getUserCommentVote(commentId: string, userId: string): Promise<CommentVote | undefined>;
+  updateCommentVoteCount(commentId: string): Promise<void>;
+  
+  // Comment report methods
+  createCommentReport(report: InsertCommentReport): Promise<CommentReport>;
+  getUserCommentReport(commentId: string, userId: string): Promise<CommentReport | undefined>;
+  
   // Combined methods
   getPostsWithVotes(userId: string, filters?: { animal?: string; limit?: number; offset?: number }): Promise<PostWithVote[]>;
 }
@@ -42,6 +59,9 @@ export class MemStorage implements IStorage {
   private votes: Map<string, Vote>;
   private reports: Map<string, Report>;
   private favorites: Map<string, Favorite>;
+  private commentVotes: Map<string, CommentVote>;
+  private commentReports: Map<string, CommentReport>;
+  private comments: Map<string, Comment>;
 
   constructor() {
     this.users = new Map();
@@ -49,6 +69,9 @@ export class MemStorage implements IStorage {
     this.votes = new Map();
     this.reports = new Map();
     this.favorites = new Map();
+    this.comments = new Map();
+    this.commentVotes = new Map();
+    this.commentReports = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -140,6 +163,9 @@ export class MemStorage implements IStorage {
     });
     Array.from(this.favorites.entries()).forEach(([favoriteId, favorite]) => {
       if (favorite.postId === id) this.favorites.delete(favoriteId);
+    });
+    Array.from(this.comments.entries()).forEach(([commentId, comment]) => {
+      if (comment.postId === id) this.comments.delete(commentId);
     });
     return this.posts.delete(id);
   }
@@ -259,17 +285,143 @@ export class MemStorage implements IStorage {
       .filter((post): post is Post => !!post);
   }
 
+  async createComment(insertComment: InsertComment): Promise<Comment> {
+    const id = randomUUID();
+    const comment: Comment = {
+      id,
+      postId: insertComment.postId,
+      userId: insertComment.userId ?? null,
+      anonymousId: insertComment.anonymousId ?? null,
+      username: insertComment.username,
+      text: insertComment.text,
+      upvotes: 0,
+      downvotes: 0,
+      createdAt: new Date(),
+    };
+
+    this.comments.set(id, comment);
+    return comment;
+  }
+
+  async getComment(id: string): Promise<Comment | undefined> {
+    return this.comments.get(id);
+  }
+
+  async getCommentsByPostId(postId: string): Promise<Comment[]> {
+    const comments = Array.from(this.comments.values())
+      .filter((comment) => comment.postId === postId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return comments;
+  }
+
+  async getCommentsWithVotes(postId: string, userId: string): Promise<CommentWithVote[]> {
+    const comments = await this.getCommentsByPostId(postId);
+    
+    return Promise.all(comments.map(async (comment) => {
+      const userVote = await this.getUserCommentVote(comment.id, userId);
+      return {
+        ...comment,
+        userVote: userVote?.voteType as 'up' | 'down' | undefined || null,
+      };
+    }));
+  }
+
+  async deleteComment(id: string): Promise<boolean> {
+    // Delete associated votes and reports
+    Array.from(this.commentVotes.entries()).forEach(([voteId, vote]) => {
+      if (vote.commentId === id) this.commentVotes.delete(voteId);
+    });
+    Array.from(this.commentReports.entries()).forEach(([reportId, report]) => {
+      if (report.commentId === id) this.commentReports.delete(reportId);
+    });
+    return this.comments.delete(id);
+  }
+
+  // Comment vote methods
+  async createCommentVote(insertVote: InsertCommentVote): Promise<CommentVote> {
+    const id = randomUUID();
+    const vote: CommentVote = {
+      ...insertVote,
+      id,
+      createdAt: new Date(),
+    };
+    
+    // Delete any existing vote by this user on this comment
+    await this.deleteCommentVote(insertVote.commentId, insertVote.userId);
+    
+    this.commentVotes.set(id, vote);
+    await this.updateCommentVoteCount(insertVote.commentId);
+    return vote;
+  }
+
+  async deleteCommentVote(commentId: string, userId: string): Promise<boolean> {
+    const existingVote = Array.from(this.commentVotes.entries()).find(
+      ([_, vote]) => vote.commentId === commentId && vote.userId === userId
+    );
+    
+    if (existingVote) {
+      this.commentVotes.delete(existingVote[0]);
+      await this.updateCommentVoteCount(commentId);
+      return true;
+    }
+    return false;
+  }
+
+  async getUserCommentVote(commentId: string, userId: string): Promise<CommentVote | undefined> {
+    return Array.from(this.commentVotes.values()).find(
+      (vote) => vote.commentId === commentId && vote.userId === userId
+    );
+  }
+
+  async updateCommentVoteCount(commentId: string): Promise<void> {
+    const comment = this.comments.get(commentId);
+    if (!comment) return;
+
+    const commentVotes = Array.from(this.commentVotes.values()).filter(v => v.commentId === commentId);
+    const upvotes = commentVotes.filter(v => v.voteType === 'up').length;
+    const downvotes = commentVotes.filter(v => v.voteType === 'down').length;
+
+    comment.upvotes = upvotes;
+    comment.downvotes = downvotes;
+    this.comments.set(commentId, comment);
+  }
+
+  // Comment report methods
+  async createCommentReport(insertReport: InsertCommentReport): Promise<CommentReport> {
+    const existingReport = await this.getUserCommentReport(insertReport.commentId, insertReport.userId);
+    if (existingReport) return existingReport;
+
+    const id = randomUUID();
+    const report: CommentReport = {
+      ...insertReport,
+      reason: insertReport.reason ?? null,
+      id,
+      createdAt: new Date(),
+    };
+
+    this.commentReports.set(id, report);
+    return report;
+  }
+
+  async getUserCommentReport(commentId: string, userId: string): Promise<CommentReport | undefined> {
+    return Array.from(this.commentReports.values()).find(
+      (report) => report.commentId === commentId && report.userId === userId
+    );
+  }
+
   async getPostsWithVotes(userId: string, filters?: { animal?: string; userId?: string; limit?: number; offset?: number }): Promise<PostWithVote[]> {
     const posts = await this.getPosts(filters);
     
     return Promise.all(posts.map(async (post) => {
       const userVote = await this.getUserVote(post.id, userId);
       const userFavorite = await this.getUserFavorite(post.id, userId);
+      const comments = await this.getCommentsByPostId(post.id);
       return {
         ...post,
         metadata: post.metadata as PostMetadata | undefined,
         userVote: userVote?.voteType as 'up' | 'down' | undefined || null,
         isFavorited: !!userFavorite,
+        commentCount: comments.length,
       };
     }));
   }
