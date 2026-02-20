@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
-import { insertPostSchema, insertVoteSchema, insertUserSchema, insertReportSchema, insertFavoriteSchema } from "@shared/schema";
+import { insertPostSchema, insertVoteSchema, insertUserSchema, insertReportSchema, insertFavoriteSchema, insertCommentSchema } from "@shared/schema";
 import bcrypt from "bcryptjs";
 
 export async function registerRoutes(
@@ -510,6 +510,106 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching user favorites:", error);
       res.status(500).json({ error: "Failed to fetch favorites" });
+    }
+  });
+
+  // Create a comment on a post
+  app.post("/api/posts/:id/comments", async (req, res) => {
+    try {
+      const loggedInUserId = req.cookies?.userId;
+      let userId: string | undefined;
+      let anonymousId: string | undefined;
+      let username: string;
+
+      if (loggedInUserId) {
+        userId = loggedInUserId;
+        const user = await storage.getUser(loggedInUserId);
+        username = user?.username || "Unknown";
+      } else {
+        anonymousId = getAnonymousUserId(req);
+        username = "Anonymous";
+      }
+
+      const postId = req.params.id;
+      const post = await storage.getPost(postId);
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+
+      const payload = insertCommentSchema.parse({
+        postId,
+        userId,
+        anonymousId,
+        username,
+        text: req.body.text,
+      });
+
+      const comment = await storage.createComment(payload);
+
+      if (anonymousId) {
+        res.cookie('anonymousId', anonymousId, {
+          maxAge: 365 * 24 * 60 * 60 * 1000,
+          httpOnly: true,
+        });
+      }
+
+      res.json(comment);
+    } catch (error) {
+      console.error("Error creating comment:", error);
+      res.status(400).json({ error: "Failed to create comment" });
+    }
+  });
+
+  // Get all comments for a post
+  app.get("/api/posts/:id/comments", async (req, res) => {
+    try {
+      const postId = req.params.id;
+      const post = await storage.getPost(postId);
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+
+      const comments = await storage.getCommentsByPostId(postId);
+      res.json(comments);
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+      res.status(500).json({ error: "Failed to fetch comments" });
+    }
+  });
+
+  // Delete a comment (only by creator)
+  app.delete("/api/comments/:id", async (req, res) => {
+    try {
+      const loggedInUserId = req.cookies?.userId;
+      const anonymousId = getAnonymousUserId(req);
+      const commentId = req.params.id;
+
+      // Get the comment to check ownership
+      const comment = await storage.getComment(commentId);
+
+      if (!comment) {
+        return res.status(404).json({ error: "Comment not found" });
+      }
+
+      // Check if user is the creator
+      const isOwner = (loggedInUserId && comment.userId === loggedInUserId) ||
+                      (!loggedInUserId && comment.anonymousId === anonymousId);
+
+      if (!isOwner) {
+        return res.status(403).json({ error: "Not authorized to delete this comment" });
+      }
+
+      await storage.deleteComment(commentId);
+
+      res.cookie('anonymousId', anonymousId, {
+        maxAge: 365 * 24 * 60 * 60 * 1000,
+        httpOnly: true,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting comment:", error);
+      res.status(500).json({ error: "Failed to delete comment" });
     }
   });
 

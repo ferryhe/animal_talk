@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Post, type InsertPost, type Vote, type InsertVote, type Report, type InsertReport, type Favorite, type InsertFavorite, type PostWithVote, type PostMetadata } from "@shared/schema";
+import { type User, type InsertUser, type Post, type InsertPost, type Vote, type InsertVote, type Report, type InsertReport, type Favorite, type InsertFavorite, type Comment, type InsertComment, type PostWithVote, type PostMetadata } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 // modify the interface with any CRUD methods
@@ -32,6 +32,12 @@ export interface IStorage {
   getUserFavorite(postId: string, userId: string): Promise<Favorite | undefined>;
   getUserFavorites(userId: string): Promise<Post[]>;
   
+  // Comment methods
+  createComment(comment: InsertComment): Promise<Comment>;
+  getComment(id: string): Promise<Comment | undefined>;
+  getCommentsByPostId(postId: string): Promise<Comment[]>;
+  deleteComment(id: string): Promise<boolean>;
+  
   // Combined methods
   getPostsWithVotes(userId: string, filters?: { animal?: string; limit?: number; offset?: number }): Promise<PostWithVote[]>;
 }
@@ -42,6 +48,7 @@ export class MemStorage implements IStorage {
   private votes: Map<string, Vote>;
   private reports: Map<string, Report>;
   private favorites: Map<string, Favorite>;
+  private comments: Map<string, Comment>;
 
   constructor() {
     this.users = new Map();
@@ -49,6 +56,7 @@ export class MemStorage implements IStorage {
     this.votes = new Map();
     this.reports = new Map();
     this.favorites = new Map();
+    this.comments = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -140,6 +148,9 @@ export class MemStorage implements IStorage {
     });
     Array.from(this.favorites.entries()).forEach(([favoriteId, favorite]) => {
       if (favorite.postId === id) this.favorites.delete(favoriteId);
+    });
+    Array.from(this.comments.entries()).forEach(([commentId, comment]) => {
+      if (comment.postId === id) this.comments.delete(commentId);
     });
     return this.posts.delete(id);
   }
@@ -259,17 +270,50 @@ export class MemStorage implements IStorage {
       .filter((post): post is Post => !!post);
   }
 
+  async createComment(insertComment: InsertComment): Promise<Comment> {
+    const id = randomUUID();
+    const comment: Comment = {
+      id,
+      postId: insertComment.postId,
+      userId: insertComment.userId ?? null,
+      anonymousId: insertComment.anonymousId ?? null,
+      username: insertComment.username,
+      text: insertComment.text,
+      createdAt: new Date(),
+    };
+
+    this.comments.set(id, comment);
+    return comment;
+  }
+
+  async getComment(id: string): Promise<Comment | undefined> {
+    return this.comments.get(id);
+  }
+
+  async getCommentsByPostId(postId: string): Promise<Comment[]> {
+    const comments = Array.from(this.comments.values())
+      .filter((comment) => comment.postId === postId)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    return comments;
+  }
+
+  async deleteComment(id: string): Promise<boolean> {
+    return this.comments.delete(id);
+  }
+
   async getPostsWithVotes(userId: string, filters?: { animal?: string; userId?: string; limit?: number; offset?: number }): Promise<PostWithVote[]> {
     const posts = await this.getPosts(filters);
     
     return Promise.all(posts.map(async (post) => {
       const userVote = await this.getUserVote(post.id, userId);
       const userFavorite = await this.getUserFavorite(post.id, userId);
+      const comments = await this.getCommentsByPostId(post.id);
       return {
         ...post,
         metadata: post.metadata as PostMetadata | undefined,
         userVote: userVote?.voteType as 'up' | 'down' | undefined || null,
         isFavorited: !!userFavorite,
+        commentCount: comments.length,
       };
     }));
   }

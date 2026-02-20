@@ -78,6 +78,20 @@ export const favorites = pgTable("favorites", {
   userIdIdx: index("favorite_user_id_idx").on(table.userId),
 }));
 
+export const comments = pgTable("comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  postId: varchar("post_id").notNull(),
+  userId: varchar("user_id"),
+  anonymousId: varchar("anonymous_id"),
+  username: text("username").notNull(),
+  text: text("text").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  postIdIdx: index("comment_post_id_idx").on(table.postId),
+  userIdIdx: index("comment_user_id_idx").on(table.userId),
+  createdAtIdx: index("comment_created_at_idx").on(table.createdAt),
+}));
+
 export const insertPostSchema = createInsertSchema(posts).omit({
   id: true,
   createdAt: true,
@@ -100,6 +114,11 @@ export const insertFavoriteSchema = createInsertSchema(favorites).omit({
   createdAt: true,
 });
 
+export const insertCommentSchema = createInsertSchema(comments).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type InsertPost = z.infer<typeof insertPostSchema>;
 export type Post = typeof posts.$inferSelect;
 export type InsertVote = z.infer<typeof insertVoteSchema>;
@@ -108,6 +127,8 @@ export type InsertReport = z.infer<typeof insertReportSchema>;
 export type Report = typeof reports.$inferSelect;
 export type InsertFavorite = z.infer<typeof insertFavoriteSchema>;
 export type Favorite = typeof favorites.$inferSelect;
+export type InsertComment = z.infer<typeof insertCommentSchema>;
+export type Comment = typeof comments.$inferSelect;
 
 // Metadata type for posts
 export type PostMetadata = {
@@ -131,5 +152,6 @@ export type PostMetadata = {
 export type PostWithVote = Omit<Post, 'metadata'> & {
   userVote?: 'up' | 'down' | null;
   isFavorited?: boolean;
+  commentCount?: number;
   metadata?: PostMetadata;
 };
