@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Volume2, ChevronDown, Check, Users, User, LogOut } from "lucide-react";
+import { Volume2, ChevronDown, Check, Users, User, LogOut, Shield } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
@@ -158,6 +158,10 @@ export default function Home() {
                 <DropdownMenuItem onClick={() => navigate('/profile')}>
                   <User className="w-4 h-4 mr-2" />
                   Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/mods')}>
+                  <Shield className="w-4 h-4 mr-2" />
+                  Mods
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="w-4 h-4 mr-2" />

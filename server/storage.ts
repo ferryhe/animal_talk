@@ -48,6 +48,25 @@ export interface IStorage {
   // Comment report methods
   createCommentReport(report: InsertCommentReport): Promise<CommentReport>;
   getUserCommentReport(commentId: string, userId: string): Promise<CommentReport | undefined>;
+
+  // Mod report summary methods
+  getReportedPostsSummary(): Promise<Array<{
+    postId: string;
+    reportCount: number;
+    lastReportedAt: Date;
+    post: Post | null;
+  }>>;
+  getReportedCommentsSummary(): Promise<Array<{
+    commentId: string;
+    reportCount: number;
+    lastReportedAt: Date;
+    comment: Comment | null;
+  }>>;
+  
+  // Mod management methods
+  getModUsernames(): Promise<string[]>;
+  addModUsername(username: string): Promise<void>;
+  removeModUsername(username: string): Promise<void>;
   
   // Combined methods
   getPostsWithVotes(userId: string, filters?: { animal?: string; limit?: number; offset?: number }): Promise<PostWithVote[]>;
@@ -62,6 +81,7 @@ export class MemStorage implements IStorage {
   private commentVotes: Map<string, CommentVote>;
   private commentReports: Map<string, CommentReport>;
   private comments: Map<string, Comment>;
+  private modUsernames: Set<string>;
 
   constructor() {
     this.users = new Map();
@@ -72,6 +92,7 @@ export class MemStorage implements IStorage {
     this.comments = new Map();
     this.commentVotes = new Map();
     this.commentReports = new Map();
+    this.modUsernames = new Set(['neohe']);
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -409,6 +430,80 @@ export class MemStorage implements IStorage {
     );
   }
 
+  async getReportedPostsSummary(): Promise<Array<{
+    postId: string;
+    reportCount: number;
+    lastReportedAt: Date;
+    post: Post | null;
+  }>> {
+    const grouped = new Map<string, { reportCount: number; lastReportedAt: Date }>();
+
+    Array.from(this.reports.values()).forEach((report) => {
+      const current = grouped.get(report.postId);
+      if (!current) {
+        grouped.set(report.postId, {
+          reportCount: 1,
+          lastReportedAt: report.createdAt,
+        });
+        return;
+      }
+
+      current.reportCount += 1;
+      if (report.createdAt.getTime() > current.lastReportedAt.getTime()) {
+        current.lastReportedAt = report.createdAt;
+      }
+    });
+
+    return Array.from(grouped.entries())
+      .map(([postId, summary]) => ({
+        postId,
+        reportCount: summary.reportCount,
+        lastReportedAt: summary.lastReportedAt,
+        post: this.posts.get(postId) ?? null,
+      }))
+      .sort((a, b) => {
+        if (b.reportCount !== a.reportCount) return b.reportCount - a.reportCount;
+        return b.lastReportedAt.getTime() - a.lastReportedAt.getTime();
+      });
+  }
+
+  async getReportedCommentsSummary(): Promise<Array<{
+    commentId: string;
+    reportCount: number;
+    lastReportedAt: Date;
+    comment: Comment | null;
+  }>> {
+    const grouped = new Map<string, { reportCount: number; lastReportedAt: Date }>();
+
+    Array.from(this.commentReports.values()).forEach((report) => {
+      const current = grouped.get(report.commentId);
+      if (!current) {
+        grouped.set(report.commentId, {
+          reportCount: 1,
+          lastReportedAt: report.createdAt,
+        });
+        return;
+      }
+
+      current.reportCount += 1;
+      if (report.createdAt.getTime() > current.lastReportedAt.getTime()) {
+        current.lastReportedAt = report.createdAt;
+      }
+    });
+
+    return Array.from(grouped.entries())
+      .map(([commentId, summary]) => ({
+        commentId,
+        reportCount: summary.reportCount,
+        lastReportedAt: summary.lastReportedAt,
+        comment: this.comments.get(commentId) ?? null,
+      }))
+      .sort((a, b) => {
+        if (b.reportCount !== a.reportCount) return b.reportCount - a.reportCount;
+        return b.lastReportedAt.getTime() - a.lastReportedAt.getTime();
+      });
+  }
+
   async getPostsWithVotes(userId: string, filters?: { animal?: string; userId?: string; limit?: number; offset?: number }): Promise<PostWithVote[]> {
     const posts = await this.getPosts(filters);
     
@@ -425,6 +520,17 @@ export class MemStorage implements IStorage {
       };
     }));
   }
-}
+
+  async getModUsernames(): Promise<string[]> {
+    return Array.from(this.modUsernames);
+  }
+
+  async addModUsername(username: string): Promise<void> {
+    this.modUsernames.add(username.trim().toLowerCase());
+  }
+
+  async removeModUsername(username: string): Promise<void> {
+    this.modUsernames.delete(username.trim().toLowerCase());
+  }}
 
 export const storage = new MemStorage();
