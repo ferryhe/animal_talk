@@ -116,6 +116,18 @@ export const commentReports = pgTable("comment_reports", {
   userIdIdx: index("comment_report_user_id_idx").on(table.userId),
 }));
 
+export const bans = pgTable("bans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(),
+  bannedBy: text("banned_by").notNull(), // mod username
+  reason: text("reason").notNull(),
+  banType: text("ban_type").notNull().default("permanent"), // 'permanent' or 'temporary'
+  expiresAt: timestamp("expires_at"), // null for permanent, timestamp for temporary
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdIdx: index("ban_user_id_idx").on(table.userId),
+}));
+
 export const insertPostSchema = createInsertSchema(posts).omit({
   id: true,
   createdAt: true,
@@ -155,6 +167,11 @@ export const insertCommentReportSchema = createInsertSchema(commentReports).omit
   createdAt: true,
 });
 
+export const insertBanSchema = createInsertSchema(bans).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type InsertPost = z.infer<typeof insertPostSchema>;
 export type Post = typeof posts.$inferSelect;
 export type InsertVote = z.infer<typeof insertVoteSchema>;
@@ -169,6 +186,9 @@ export type InsertCommentVote = z.infer<typeof insertCommentVoteSchema>;
 export type CommentVote = typeof commentVotes.$inferSelect;
 export type InsertCommentReport = z.infer<typeof insertCommentReportSchema>;
 export type CommentReport = typeof commentReports.$inferSelect;
+
+export type Ban = typeof bans.$inferSelect;
+export type InsertBan = z.infer<typeof insertBanSchema>;
 
 // Metadata type for posts
 export type PostMetadata = {

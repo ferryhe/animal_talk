@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -11,12 +11,17 @@ import { Trash2, Plus } from "lucide-react";
 export default function Mods() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [password, setPassword] = useState("");
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [lockedByOther, setLockedByOther] = useState(false);
   const [needsLogin, setNeedsLogin] = useState(false);
   const [notMod, setNotMod] = useState(false);
   const [newModUsername, setNewModUsername] = useState("");
+  const [banUsername, setBanUsername] = useState("");
+  const [banReason, setBanReason] = useState("");
+  const [banType, setBanType] = useState<"permanent" | "temporary">("permanent");
+  const [banDurationDays, setBanDurationDays] = useState("7");
 
   const loadStatus = async () => {
     try {
@@ -135,6 +140,18 @@ export default function Mods() {
     enabled: isUnlocked,
   });
 
+  const { data: postsData = [] } = useQuery({
+    queryKey: ["posts"],
+    queryFn: async () => {
+      const response = await fetch("/api/posts", {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to load posts");
+      return response.json() as Promise<any[]>;
+    },
+    enabled: isUnlocked,
+  });
+
   const addModMutation = useMutation({
     mutationFn: async (username: string) => {
       const response = await fetch("/api/mod/add", {
@@ -183,6 +200,123 @@ export default function Mods() {
     onError: (error: any) => {
       toast({
         title: error.message || "Failed to remove mod",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deletePostMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      const response = await fetch(`/api/mod/delete-post/${postId}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to delete post");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mod-reports"] });
+      toast({ title: "Post deleted" });
+    },
+    onError: () => {
+      toast({
+        title: "Failed to delete post",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: async (commentId: string) => {
+      const response = await fetch(`/api/mod/delete-comment/${commentId}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to delete comment");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mod-reports"] });
+      toast({ title: "Comment deleted" });
+    },
+    onError: () => {
+      toast({
+        title: "Failed to delete comment",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const banMutation = useMutation({
+    mutationFn: async () => {
+      if (!banUsername) {
+        throw new Error("Username is required");
+      }
+
+      const response = await fetch("/api/mod/ban-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          username: banUsername,
+          reason: banReason,
+          banType: banType,
+          durationDays: banType === "temporary" ? parseInt(banDurationDays) || 1 : undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: "Failed to ban user" }));
+        throw new Error(error.error || "Failed to ban user");
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "User banned successfully",
+        description: `${banUsername} has been ${banType === "temporary" ? "suspended for " + banDurationDays + " days" : "permanently banned"}`,
+      });
+      setBanUsername("");
+      setBanReason("");
+      setBanType("permanent");
+      setBanDurationDays("7");
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to ban user",
+        description: error.message || "An error occurred",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const unbanMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await fetch(`/api/mod/unban-user/${userId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: "Failed to unban user" }));
+        throw new Error(error.error || "Failed to unban user");
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "User unbanned successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to unban user",
+        description: error.message || "An error occurred",
         variant: "destructive",
       });
     },
@@ -327,6 +461,60 @@ export default function Mods() {
                 </div>
               </div>
 
+              <div className="space-y-2 border-t pt-4">
+                <h3 className="font-semibold text-sm">Ban/Suspend Users</h3>
+                <div className="space-y-3">
+                  <Input
+                    placeholder="Username to ban"
+                    value={banUsername}
+                    onChange={(e) => setBanUsername(e.target.value)}
+                  />
+                  <Input
+                    placeholder="Reason for ban"
+                    value={banReason}
+                    onChange={(e) => setBanReason(e.target.value)}
+                  />
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        name="banType"
+                        value="permanent"
+                        checked={banType === "permanent"}
+                        onChange={(e) => setBanType(e.target.value as "permanent" | "temporary")}
+                      />
+                      Permanent Ban
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        name="banType"
+                        value="temporary"
+                        checked={banType === "temporary"}
+                        onChange={(e) => setBanType(e.target.value as "permanent" | "temporary")}
+                      />
+                      Temporary Suspension
+                    </label>
+                  </div>
+                  {banType === "temporary" && (
+                    <Input
+                      type="number"
+                      placeholder="Duration (days)"
+                      value={banDurationDays}
+                      onChange={(e) => setBanDurationDays(e.target.value)}
+                      min="1"
+                      max="365"
+                    />
+                  )}
+                  <Button
+                    onClick={() => banMutation.mutate()}
+                    disabled={!banUsername.trim() || !banReason.trim() || banMutation.isPending}
+                    className="w-full"
+                  >
+                    {banMutation.isPending ? "Banning..." : "Ban User"}
+                  </Button>
+                </div>
+              </div>
               {reportsLoading ? (
                 <p className="text-sm text-muted-foreground">Loading reports...</p>
               ) : (
@@ -338,12 +526,22 @@ export default function Mods() {
                       {reportsData?.posts.length ? (
                         <div className="space-y-2">
                           {reportsData.posts.map((item) => (
-                            <div key={item.postId} className="rounded-md border p-3 space-y-1">
+                            <div key={item.postId} className="rounded-md border p-3 space-y-2">
                               <div className="flex items-center justify-between gap-2">
-                                <p className="text-sm font-medium truncate">
+                                <p className="text-sm font-medium truncate flex-1">
                                   {item.post?.username || "Unknown"} - {item.post?.soundType || "Deleted post"}
                                 </p>
-                                <Badge variant="destructive">{item.reportCount}x</Badge>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="destructive">{item.reportCount}x</Badge>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => deletePostMutation.mutate(item.postId)}
+                                    disabled={deletePostMutation.isPending}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
                               </div>
                               <p className="text-xs text-muted-foreground line-clamp-2">
                                 {item.post?.interpretation || "Post no longer exists"}
@@ -361,12 +559,22 @@ export default function Mods() {
                       {reportsData?.messages.length ? (
                         <div className="space-y-2">
                           {reportsData.messages.map((item) => (
-                            <div key={item.commentId} className="rounded-md border p-3 space-y-1">
+                            <div key={item.commentId} className="rounded-md border p-3 space-y-2">
                               <div className="flex items-center justify-between gap-2">
-                                <p className="text-sm font-medium truncate">
+                                <p className="text-sm font-medium truncate flex-1">
                                   {item.comment?.username || "Unknown"}
                                 </p>
-                                <Badge variant="destructive">{item.reportCount}x</Badge>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="destructive">{item.reportCount}x</Badge>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => deleteCommentMutation.mutate(item.commentId)}
+                                    disabled={deleteCommentMutation.isPending}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
                               </div>
                               <p className="text-xs text-muted-foreground line-clamp-2">
                                 {item.comment?.text || "Message no longer exists"}
