@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Post, type InsertPost, type Vote, type InsertVote, type Report, type InsertReport, type Favorite, type InsertFavorite, type Comment, type InsertComment, type CommentVote, type InsertCommentVote, type CommentReport, type InsertCommentReport, type PostWithVote, type CommentWithVote, type PostMetadata } from "@shared/schema";
+import { type User, type InsertUser, type Post, type InsertPost, type Vote, type InsertVote, type Report, type InsertReport, type Favorite, type InsertFavorite, type Comment, type InsertComment, type CommentVote, type InsertCommentVote, type CommentReport, type InsertCommentReport, type PostWithVote, type CommentWithVote, type PostMetadata, type Ban, type InsertBan } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 // modify the interface with any CRUD methods
@@ -68,6 +68,12 @@ export interface IStorage {
   addModUsername(username: string): Promise<void>;
   removeModUsername(username: string): Promise<void>;
   
+  // Ban methods
+  banUser(userId: string, reason: string, bannedBy: string, banType: 'permanent' | 'temporary', expiresAt?: Date): Promise<Ban>;
+  unbanUser(userId: string): Promise<boolean>;
+  getUserBan(userId: string): Promise<Ban | undefined>;
+  isUserBanned(userId: string): Promise<boolean>;
+  
   // Combined methods
   getPostsWithVotes(userId: string, filters?: { animal?: string; limit?: number; offset?: number }): Promise<PostWithVote[]>;
 }
@@ -82,6 +88,7 @@ export class MemStorage implements IStorage {
   private commentReports: Map<string, CommentReport>;
   private comments: Map<string, Comment>;
   private modUsernames: Set<string>;
+  private bans: Map<string, Ban>;
 
   constructor() {
     this.users = new Map();
@@ -93,6 +100,7 @@ export class MemStorage implements IStorage {
     this.commentVotes = new Map();
     this.commentReports = new Map();
     this.modUsernames = new Set(['neohe']);
+    this.bans = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -531,6 +539,43 @@ export class MemStorage implements IStorage {
 
   async removeModUsername(username: string): Promise<void> {
     this.modUsernames.delete(username.trim().toLowerCase());
-  }}
+  }
+
+  async banUser(userId: string, reason: string, bannedBy: string, banType: 'permanent' | 'temporary', expiresAt?: Date): Promise<Ban> {
+    const ban: Ban = {
+      id: `ban_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      userId,
+      reason,
+      bannedBy,
+      banType,
+      expiresAt: expiresAt || null,
+      createdAt: new Date(),
+    };
+    this.bans.set(userId, ban);
+    return ban;
+  }
+
+  async unbanUser(userId: string): Promise<boolean> {
+    return this.bans.delete(userId);
+  }
+
+  async getUserBan(userId: string): Promise<Ban | undefined> {
+    const ban = this.bans.get(userId);
+    if (!ban) return undefined;
+    
+    // Check if temporary ban has expired
+    if (ban.expiresAt && new Date() > ban.expiresAt) {
+      this.bans.delete(userId);
+      return undefined;
+    }
+    
+    return ban;
+  }
+
+  async isUserBanned(userId: string): Promise<boolean> {
+    const ban = await this.getUserBan(userId);
+    return !!ban;
+  }
+}
 
 export const storage = new MemStorage();

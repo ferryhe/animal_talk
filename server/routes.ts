@@ -274,6 +274,12 @@ export async function registerRoutes(
         userId = loggedInUserId;
         const user = await storage.getUser(loggedInUserId);
         username = user?.username || "Unknown";
+        
+        // Check if user is banned
+        const isBanned = await storage.isUserBanned(userId);
+        if (isBanned) {
+          return res.status(403).json({ error: "Your account has been banned" });
+        }
       } else {
         userId = getAnonymousUserId(req);
         username = "Anonymous";
@@ -589,6 +595,14 @@ export async function registerRoutes(
         userId = loggedInUserId;
         const user = await storage.getUser(loggedInUserId);
         username = user?.username || "Unknown";
+        
+        // Check if user is banned
+        if (userId) {
+          const isBanned = await storage.isUserBanned(userId);
+          if (isBanned) {
+            return res.status(403).json({ error: "Your account has been banned" });
+          }
+        }
       } else {
         anonymousId = getAnonymousUserId(req);
         username = "Anonymous";
@@ -943,6 +957,82 @@ export async function registerRoutes(
     await storage.removeModUsername(username);
     const updatedMods = await storage.getModUsernames();
     return res.json({ success: true, mods: updatedMods });
+  });
+
+  app.post("/api/mod/delete-post/:id", async (req, res) => {
+    const loggedInUserId = req.cookies?.userId;
+    const postId = req.params.id;
+
+    if (!loggedInUserId || !hasModAccess(req)) {
+      return res.status(403).json({ error: "Mod access required" });
+    }
+
+    const deleted = await storage.deletePost(postId);
+    if (!deleted) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+
+    return res.json({ success: true });
+  });
+
+  app.post("/api/mod/delete-comment/:id", async (req, res) => {
+    const loggedInUserId = req.cookies?.userId;
+    const commentId = req.params.id;
+
+    if (!loggedInUserId || !hasModAccess(req)) {
+      return res.status(403).json({ error: "Mod access required" });
+    }
+
+    const deleted = await storage.deleteComment(commentId);
+    if (!deleted) {
+      return res.status(404).json({ error: "Comment not found" });
+    }
+
+    return res.json({ success: true });
+  });
+
+  app.post("/api/mod/ban-user", async (req, res) => {
+    const loggedInUserId = req.cookies?.userId;
+    const { username, reason, banType, durationDays } = req.body || {};
+    const currentUser = await storage.getUser(loggedInUserId);
+
+    if (!loggedInUserId || !hasModAccess(req)) {
+      return res.status(403).json({ error: "Mod access required" });
+    }
+
+    if (!username || !reason) {
+      return res.status(400).json({ error: "Username and reason required" });
+    }
+
+    // Look up user by username
+    const userToBan = await storage.getUserByUsername(username);
+    if (!userToBan) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    let expiresAt: Date | undefined;
+    if (banType === "temporary" && durationDays) {
+      expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
+    }
+
+    await storage.banUser(userToBan.id, reason, currentUser?.username || "unknown", banType || "permanent", expiresAt);
+    return res.json({ success: true, banned: userToBan.username });
+  });
+
+  app.post("/api/mod/unban-user/:userId", async (req, res) => {
+    const loggedInUserId = req.cookies?.userId;
+    const userId = req.params.userId;
+
+    if (!loggedInUserId || !hasModAccess(req)) {
+      return res.status(403).json({ error: "Mod access required" });
+    }
+
+    const unbanned = await storage.unbanUser(userId);
+    if (!unbanned) {
+      return res.status(404).json({ error: "User ban not found" });
+    }
+
+    return res.json({ success: true });
   });
 
   return httpServer;
